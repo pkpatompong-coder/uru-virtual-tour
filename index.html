@@ -1,0 +1,1128 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>URU Virtual Tour 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600&family=Chakra+Petch:wght@500;600;700&display=swap">
+<style>
+/* Layout: full-bleed realistic 3D scene; frosted instrument panels float over it (stops left, minimap + clock right, info card bottom) */
+:root{
+  --panel:rgba(250,250,246,.82); --panel-solid:#fafaf6; --line:rgba(40,50,44,.16); --fg:#1d2621; --muted:#5a665e;
+  --accent:#6d3a92; --accent-ink:#ffffff; --gold:#c18a1c; --shadow:0 8px 30px rgba(10,20,15,.18);
+  --font-display:"Chakra Petch","Anuphan",system-ui,sans-serif;
+  --font-body:"Anuphan","Noto Sans Thai",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --panel:rgba(18,22,20,.78); --panel-solid:#121614; --line:rgba(230,240,232,.14); --fg:#e9eee9; --muted:#9eaaa2;
+  --accent:#c39ae3; --accent-ink:#1a1220; --gold:#e5b75a; --shadow:0 8px 30px rgba(0,0,0,.45); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --panel:rgba(18,22,20,.78); --panel-solid:#121614; --line:rgba(230,240,232,.14); --fg:#e9eee9; --muted:#9eaaa2;
+  --accent:#c39ae3; --accent-ink:#1a1220; --gold:#e5b75a; --shadow:0 8px 30px rgba(0,0,0,.45); color-scheme:dark}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{background:#0d1214;color:var(--fg);font-family:var(--font-body);font-size:15px;overflow:hidden}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;touch-action:none;outline:none}
+.glass{background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3)}
+
+.labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;font:600 12px/1.2 var(--font-body);color:var(--fg);
+  padding:3px 9px 3px 4px;border-radius:999px;white-space:nowrap;display:flex;gap:6px;align-items:center;will-change:transform}
+.lbl b{font:700 11px/1 var(--font-display);color:var(--accent-ink);background:var(--accent);border-radius:999px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px}
+.lbl::after{content:"";position:absolute;left:50%;bottom:-7px;width:1px;height:7px;background:var(--fg);opacity:.5}
+.lbl.on{outline:2px solid var(--accent)}
+.lbl.far span{display:none}.lbl.far{padding:3px}.lbl.far.on span{display:inline}
+.lbl.pin b{background:var(--gold)}
+.mlabel{position:absolute;left:0;top:0;font:700 13px/1 var(--font-display);padding:6px 10px;border-radius:8px;color:var(--fg);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+header.bar{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;
+  padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none;z-index:3}
+.brand{pointer-events:auto;border-radius:12px;padding:9px 14px;min-width:0}
+.brand h1{margin:0;font:700 18px/1.15 var(--font-display);letter-spacing:.01em}
+.brand p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.tools{pointer-events:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:640px}
+button,.btn{font:600 13px/1 var(--font-body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 12px;cursor:pointer;text-decoration:none;
+  display:inline-flex;gap:6px;align-items:center;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);transition:border-color .15s,background .15s}
+button:hover,.btn:hover{border-color:var(--accent)}
+button:focus-visible,.btn:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.ico{width:15px;height:15px;flex:none}
+
+aside.list{position:fixed;left:max(16px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 96px);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);width:268px;
+  border-radius:14px;display:flex;flex-direction:column;overflow:hidden;z-index:2}
+.list .head{padding:12px 12px 8px;display:flex;flex-direction:column;gap:8px}
+.list h2{margin:0;font:600 11px/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
+.list input{font:500 14px var(--font-body);color:var(--fg);background:var(--panel-solid);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;box-sizing:border-box}
+.list ol{list-style:none;margin:0;padding:0 6px 8px;overflow:auto;flex:1}
+.stop{display:grid;grid-template-columns:24px 1fr;gap:8px;align-items:center;width:100%;text-align:left;border:0;background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;border-radius:8px;padding:7px 8px;font-weight:500}
+.stop:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.stop.on{background:color-mix(in srgb,var(--accent) 20%,transparent)}
+.stop .n{font:700 12px/1 var(--font-display);color:var(--accent);font-variant-numeric:tabular-nums}
+.stop .t{min-width:0;line-height:1.3}
+.stop small{display:block;color:var(--muted);font-weight:400;font-size:12px}
+.src{border-top:1px solid var(--line);padding:8px 14px;font-size:12px;color:var(--muted);max-height:40%;overflow:auto}
+.src summary{cursor:pointer;font-weight:600;color:var(--fg)}
+.src p{margin:6px 0 0;line-height:1.5}
+
+.side{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 96px);display:flex;flex-direction:column;gap:10px;align-items:flex-end;z-index:2}
+.clock{border-radius:14px;padding:10px 12px;width:230px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px}
+.clock .top{display:flex;justify-content:space-between;align-items:baseline}
+.clock .time{font:700 26px/1 var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.clock .sun{font-size:12px;color:var(--muted);text-align:right;line-height:1.3}
+.clock input[type=range]{width:100%;accent-color:var(--accent)}
+.clock .row{display:flex;gap:6px}
+.clock .row button{flex:1;justify-content:center;padding:7px 8px;font-size:12px}
+.mm{border-radius:14px;padding:6px;position:relative}
+.mm canvas{display:block;border-radius:9px;cursor:crosshair}
+.mm span{position:absolute;left:12px;top:10px;font:600 10px/1 var(--font-display);letter-spacing:.12em;color:#1d2621;background:rgba(255,255,255,.7);padding:3px 5px;border-radius:4px}
+
+.card{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 16px);width:360px;max-width:calc(100% - 32px);
+  border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;z-index:2;box-sizing:border-box}
+.card .eyebrow{font:600 11px/1 var(--font-display);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.card h3{margin:0;font:700 21px/1.2 var(--font-display);text-wrap:balance}
+.card p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.55}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
+.facts div{border-top:1px solid var(--line);padding-top:6px;min-width:0}
+.facts dt{font-size:11px;color:var(--muted)}
+.facts dd{margin:2px 0 0;font:600 14px/1.2 var(--font-display);font-variant-numeric:tabular-nums}
+.card .row{display:flex;gap:6px;flex-wrap:wrap}
+.progress{height:3px;background:var(--line);border-radius:3px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--accent)}
+
+.joy{position:fixed;left:calc(max(16px,env(safe-area-inset-left,0px)) + 10px);bottom:calc(env(safe-area-inset-bottom,0px) + 26px);width:120px;height:120px;border-radius:50%;z-index:4;touch-action:none}
+.joy i{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:var(--accent);opacity:.85}
+.whint{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 96px);font-size:12.5px;padding:7px 12px;border-radius:999px;z-index:2;white-space:nowrap}
+
+.intro{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:5;transition:opacity 1.2s}
+.intro div{text-align:center;color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.55)}
+.intro small{font:600 12px/1 var(--font-display);letter-spacing:.35em;opacity:.85}
+.intro h2{margin:12px 0 8px;font:700 clamp(30px,6vw,64px)/1.05 var(--font-display);letter-spacing:.01em}
+.intro p{margin:0;font-size:15px;opacity:.9}
+.intro.out{opacity:0}
+.flash{position:fixed;inset:0;background:#dfe8ff;opacity:0;pointer-events:none;z-index:1;transition:opacity .08s}
+#toggleList{display:none}
+.tool{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 96px);width:380px;max-width:calc(100% - 32px);border-radius:14px;padding:12px 14px;z-index:4;display:flex;flex-direction:column;gap:10px;box-sizing:border-box;max-height:calc(100% - 130px);overflow:auto}
+.tool .th{display:flex;justify-content:space-between;align-items:center;font:600 15px/1.2 var(--font-display)}
+.tool .x{padding:5px 9px}
+.tool label{display:grid;grid-template-columns:34px 1fr;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.tool select{font:500 13.5px var(--font-body);color:var(--fg);background:var(--panel-solid);border:1px solid var(--line);border-radius:8px;padding:7px 8px;min-width:0;width:100%}
+.trow{display:flex;gap:6px;flex-wrap:wrap}.trow button{flex:1;justify-content:center}
+button:disabled{opacity:.45;cursor:not-allowed}
+.tout{margin:0;font-size:13px;color:var(--muted);line-height:1.5}.tout b{color:var(--fg)}
+.hstat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.hstat div{border-top:1px solid var(--line);padding-top:6px}.hstat small{display:block;font-size:11px;color:var(--muted)}.hstat b{font:700 20px/1.1 var(--font-display);font-variant-numeric:tabular-nums}
+.hlist{display:flex;flex-wrap:wrap;gap:5px}.hchip{font-size:12px;padding:6px 9px}.hchip.got{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:var(--accent);cursor:default}
+.qcard{border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:8px}.qat{font:600 11px/1 var(--font-display);letter-spacing:.1em;color:var(--accent)}
+.qq{margin:0;font:600 15px/1.45 var(--font-body)}.qo{display:grid;grid-template-columns:1fr 1fr;gap:6px}.qo button{justify-content:center;text-align:center;line-height:1.3;padding:9px 8px}
+.qo button.ok{background:#2f9e6a;color:#fff;border-color:#2f9e6a;opacity:1}.qo button.no{background:#c0392b;color:#fff;border-color:#c0392b;opacity:1}.qf{font-size:13px;color:var(--muted);line-height:1.5}.qf b{color:var(--fg)}
+.hl{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;font:700 13px/1 var(--font-display);color:#5a3d00;background:#ffd76a;border:1px solid #c9971f;border-radius:999px;padding:5px 9px}
+.fl{position:absolute;left:0;top:0;display:flex;flex-direction:column;gap:2px;padding:5px 9px;border-radius:8px;font-size:12px;max-width:260px;pointer-events:none}
+.fl b{font:700 12px/1.1 var(--font-display);color:var(--accent)}.fl span{color:var(--fg);line-height:1.35}
+.presentx{display:none}
+body.present header.bar,body.present aside.list,body.present .side,body.present .card,body.present .tool,body.present .labels:not(#labels){display:none!important}
+body.present .presentx{display:inline-flex;position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:6;opacity:.75}
+@media (max-width:820px){.tool{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);z-index:5}.qo{grid-template-columns:1fr}}
+
+@media (max-width:820px){
+  .brand p,.wide{display:none}
+  .tools{max-width:none}
+  aside.list{width:auto;right:max(16px,env(safe-area-inset-right,0px));top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);max-height:52%}
+  aside.list[hidden]{display:none!important}
+  .card{left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));width:auto;max-width:none;padding:12px 14px;gap:8px}
+  .card p{display:none}
+  .side{top:calc(env(safe-area-inset-top,0px) + 108px);gap:8px}
+  .clock{width:150px;padding:8px 9px;gap:6px}
+  .clock .row button{padding:6px 5px;font-size:11px}
+  .brand{padding:7px 11px}.brand h1{font-size:15px;white-space:nowrap}
+  .card .row{flex-wrap:nowrap;overflow-x:auto}
+  .card .row .btn,.card .row button{white-space:nowrap;padding:8px 10px}
+  .clock .time{font-size:20px}
+  .clock .sun{display:none}
+  #toggleList{display:inline-flex}
+  .whint{display:none}
+}
+@media (max-width:480px){.tools button{padding:8px 9px;font-size:12px}.facts{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div id="stage"></div>
+<div class="flash" id="flash"></div>
+<div class="labels" id="labels"></div>
+
+<div class="intro" id="intro"><div><small>VIRTUAL TOUR 3D</small><h2>มหาวิทยาลัยราชภัฏอุตรดิตถ์</h2><p>ลาก หมุน ซูม หรือกดทัวร์อัตโนมัติเพื่อเริ่มชม</p></div></div>
+
+<header class="bar">
+  <div class="brand glass">
+    <h1>ราชภัฏอุตรดิตถ์ 3D</h1>
+    <p>แบบจำลองจากข้อมูลแผนที่ OpenStreetMap</p>
+  </div>
+  <div class="tools">
+    <button id="tourBtn" class="primary" type="button">▶ ทัวร์อัตโนมัติ</button>
+    <button id="walkBtn" type="button" aria-pressed="false">🚶 เดินชม</button>
+    <button id="droneBtn" type="button" aria-pressed="false" class="wide">🛸 โดรนบินวน</button>
+    <button id="rainBtn" type="button" aria-pressed="false">🌧 ฝน</button>
+    <button id="measureBtn" type="button" aria-pressed="false" class="wide">📏 วัดระยะ</button>
+    <button id="navBtn" type="button">🧭 นำทาง</button>
+    <button id="huntBtn" type="button">🏆 ภารกิจ</button>
+    <button id="presentBtn" type="button" class="wide">🎬 นำเสนอ</button>
+    <button id="overBtn" type="button">ภาพรวม</button>
+    <button id="toggleList" type="button">☰ จุดชม</button>
+  </div>
+</header>
+
+<aside class="list glass" id="list">
+  <div class="head">
+    <h2><span>จุดชมในวิทยาเขต</span><span id="count"></span></h2>
+    <input id="search" type="search" placeholder="ค้นหาอาคาร…" autocomplete="off">
+  </div>
+  <ol id="stops"></ol>
+  <details class="src"><summary>ที่มาของข้อมูล</summary>
+    <p>รูปทรงฐานอาคาร ถนน สนาม และแหล่งน้ำ: OpenStreetMap</p>
+    <p>จำนวนชั้นและลักษณะอาคารสำคัญ: บทความวิกิพีเดียภาษาไทยเรื่องมหาวิทยาลัยราชภัฏอุตรดิตถ์ (ภูมิราชภัฏ 9 ชั้น, ICIT 4 ชั้นมีโดม, หอประชุมทรงไทยประยุกต์ 1 ชั้น)</p>
+    <p>สีผนังและหลังคา: ภาพถ่ายใน Wikimedia Commons และภาพที่มหาวิทยาลัยเผยแพร่ เช่น แผนผังอาคารเรียนของสำนักวิชาศึกษาทั่วไป</p>
+    <p>อาคารที่ไม่มีข้อมูล ใช้สีขาว-ครีมกับหลังคาเขียวตามลักษณะส่วนใหญ่ในภาพถ่ายมุมสูง ภูเขาบนขอบฟ้าเป็นภาพประกอบทิศทาง ไม่ใช่รูปทรงจริง</p>
+  </details>
+</aside>
+
+<div class="side">
+  <div class="clock glass">
+    <div class="top"><span class="time" id="clockTime">16:00</span><span class="sun" id="sunInfo"></span></div>
+    <input id="timeRange" type="range" min="0" max="24" step="0.05" value="16" aria-label="เวลาในแบบจำลอง">
+    <div class="row"><button id="nowBtn" type="button">เวลาจริง</button><button id="lapseBtn" type="button" aria-pressed="false">⏩ ไทม์แลปส์</button></div>
+  </div>
+  <div class="mm glass" id="mmWrap"><span>MAP</span><canvas id="mm" aria-label="แผนที่ย่อ คลิกเพื่อไปยังตำแหน่ง"></canvas></div>
+</div>
+
+<section class="card glass" id="card" aria-live="polite">
+  <div class="eyebrow" id="cEyebrow">ภาพรวม</div>
+  <h3 id="cTitle">มหาวิทยาลัยราชภัฏอุตรดิตถ์</h3>
+  <p id="cText">ลากเพื่อหมุนมุมมอง เลื่อนล้อเมาส์หรือถ่างนิ้วเพื่อซูม คลิกอาคารหรือรายการทางซ้ายเพื่อบินไปยังจุดนั้น</p>
+  <dl class="facts" id="cFacts" hidden></dl>
+  <div class="progress" id="prog" hidden><i id="progBar"></i></div>
+  <div class="row">
+    <button id="prevBtn" type="button">←</button>
+    <button id="nextBtn" type="button">ถัดไป →</button>
+    <a class="btn" id="gmLink" target="_blank" rel="noopener" href="#">Google Maps ↗</a>
+    <a class="btn" id="svLink" target="_blank" rel="noopener" href="#">Street View ↗</a>
+    <button id="inBtn" type="button" hidden>🏢 ดูภายในอาคาร</button>
+  </div>
+</section>
+<div class="joy glass" id="joy" hidden><i id="joyK"></i></div>
+<div class="whint glass" id="whint" hidden>W A S D หรือปุ่มลูกศรเพื่อเดิน · Shift วิ่ง · ลากเมาส์เพื่อมองรอบ</div>
+<div class="labels" id="mlabels"></div>
+<div class="labels" id="xlabels"></div>
+<section class="tool glass" id="tool" hidden aria-live="polite"></section>
+<button id="presentX" class="presentx" type="button">ออกจากโหมดนำเสนอ</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/objects/Sky.js"></script>
+<script>
+const OSM={"u":[[345,-252],[220,-306],[-7,-388],[-37,-276],[-51,-205],[-101,-174],[-138,-21],[-143,15],[-157,25],[-158,51],[-119,126],[-101,153],[-83,197],[-68,269],[-78,295],[-87,312],[-86,336],[-81,352],[-83,382],[-127,425],[-146,449],[-151,461],[224,562],[228,538],[236,524],[249,506],[270,401],[308,121],[284,119],[309,4],[298,3],[282,5],[269,5],[267,-4],[269,-24],[281,-70],[315,-159],[326,-201],[345,-252]],
+"b":[["",0,"yes",[[15,-502],[56,-485],[108,-613],[66,-630]]],["",0,"yes",[[211,-219],[214,-253],[230,-252],[227,-218]]],["อาคารภูมิราชภัฏ",0,"yes",[[71,-30],[58,-38],[67,-48],[77,-53],[88,-55],[134,-46],[135,-46],[132,-30],[130,-23],[127,-17],[123,-13],[116,-8],[110,-5],[105,-4],[103,-14],[98,-14],[96,-3],[52,-11],[53,-12],[50,-13],[53,-25],[70,-22]]],["โรงอาหาร",0,"yes",[[50,75],[46,108],[88,112],[88,107],[94,107],[96,81]]],["อาคาร10",0,"yes",[[47,-76],[140,-58],[143,-73],[50,-91]]],["อาคารเทคโนโลยี",0,"yes",[[-66,116],[-62,92],[-46,94],[-1,101],[-5,127],[-28,123],[-29,126],[-42,124],[-42,120]]],["ตึกมนุษยศาสตร์",0,"yes",[[195,-90],[254,-79],[250,-62],[192,-73]]],["นานาชาติ",0,"yes",[[29,-138],[18,-76],[-43,-87],[-38,-114],[-10,-109],[-9,-115],[-1,-114],[4,-142]]],["โรงจอดรถหลังโรงอาหาร",0,"yes",[[34,126],[26,181],[71,188],[78,134]]],["ห้องประชุม",0,"yes",[[103,116],[109,78],[165,87],[158,124]]],["",0,"yes",[[-109,63],[-102,24],[-85,27],[-89,55],[-93,54],[-95,65]]],["ตึก ท.อ",0,"yes",[[-97,4],[-99,19],[-60,26],[-57,10]]],["อาคารโรงงาน",0,"yes",[[-102,71],[-102,87],[-101,87],[-101,90],[-96,90],[-96,96],[-69,98],[-69,94],[-65,95],[-64,91],[-59,91],[-58,74],[-88,72]]],["ตึกวิทยการจัดการ",0,"yes",[[246,-27],[226,-22],[227,-16],[227,-14],[226,-10],[225,-8],[224,-4],[221,2],[218,5],[215,7],[211,9],[205,11],[203,11],[200,10],[196,9],[191,5],[186,1],[180,-4],[178,-7],[160,-12],[157,8],[162,12],[156,20],[161,24],[159,26],[171,34],[174,37],[178,39],[182,41],[185,42],[187,43],[189,43],[194,44],[196,44],[202,44],[207,44],[211,43],[219,40],[218,32],[228,27],[231,25],[235,22],[239,19],[240,18],[241,13],[242,8],[245,-2],[247,-9],[248,-13],[249,-17],[247,-23]]],["ตึกคณะมนุษย์",0,"yes",[[52,-98],[146,-81],[148,-93],[151,-92],[153,-101],[56,-119]]],["อาคารก่อสร้าง",0,"yes",[[-130,45],[-146,53],[-131,85],[-115,77]]],["",0,"yes",[[-482,681],[-485,686],[-484,693],[-478,697],[-471,694],[-462,694],[-456,698],[-448,699],[-440,699],[-432,702],[-430,708],[-420,743],[-391,734],[-393,726],[-390,726],[-399,694],[-409,697],[-414,680],[-419,681],[-455,684],[-475,681]]],["",0,"yes",[[-182,-564],[-155,-553],[-167,-527],[-194,-540]]],["",0,"yes",[[-181,-567],[-155,-555],[-141,-585],[-167,-597]]],["",0,"yes",[[-151,-635],[-166,-600],[-139,-588],[-125,-623]]],["",0,"yes",[[-264,-573],[-238,-560],[-212,-578],[-226,-599]]],["",0,"yes",[[-224,-600],[-211,-581],[-207,-583],[-204,-577],[-193,-574],[-178,-607],[-190,-624]]],["",0,"yes",[[-232,-558],[-206,-546],[-194,-572],[-209,-578],[-223,-566],[-226,-566],[-231,-562]]],["",0,"yes",[[-279,-623],[-263,-599],[-231,-620],[-250,-644]]],["",0,"yes",[[-319,-584],[-307,-566],[-272,-590],[-296,-625]]],["",0,"yes",[[-293,-554],[-276,-564],[-241,-550],[-248,-534]]],["",0,"yes",[[-295,-545],[-302,-531],[-267,-514],[-258,-528]]],["",0,"yes",[[-246,-480],[-253,-466],[-291,-481],[-282,-495]]],["",0,"yes",[[-295,-500],[-286,-495],[-294,-482],[-302,-488]]],["",0,"yes",[[-315,-511],[-297,-501],[-312,-475],[-330,-484]]],["",0,"yes",[[-332,-481],[-313,-470],[-327,-445],[-346,-456]]],["",0,"yes",[[-347,-453],[-327,-441],[-348,-406],[-368,-418]]],["",0,"yes",[[-369,-415],[-349,-404],[-372,-370],[-390,-379]]],["ศรีพงษ์พาร์ค",0,"yes",[[-244,-471],[-228,-464],[-247,-438],[-257,-423],[-308,-346],[-323,-354],[-334,-340],[-368,-359],[-349,-387],[-306,-450],[-291,-442],[-284,-453],[-262,-443]]],["",0,"carport",[[-279,-378],[-239,-349],[-252,-322],[-298,-350]]],["",0,"carport",[[-283,-334],[-256,-317],[-279,-281],[-306,-297]]],["",0,"yes",[[-257,-514],[-237,-505],[-229,-524],[-249,-532]]],["",0,"yes",[[-233,-545],[-210,-536],[-217,-520],[-239,-530]]],["",0,"yes",[[-251,-390],[-235,-380],[-241,-369],[-258,-379]]],["",0,"yes",[[-245,-400],[-230,-389],[-234,-381],[-251,-391]]],["",0,"yes",[[-209,-413],[-196,-405],[-222,-360],[-238,-368]]],["",0,"yes",[[-257,-405],[-249,-399],[-260,-378],[-269,-385]]],["บี แอนด์ บี อพาร์ทเม้นท์",0,"dormitory",[[-253,-225],[-259,-193],[-222,-187],[-216,-205],[-234,-208],[-231,-221]]],["",0,"yes",[[9,-307],[5,-280],[52,-271],[56,-300]]],["คณะครุศาสตร์ อาคาร9",0,"yes",[[19,-273],[3,-275],[-5,-231],[44,-222],[47,-238],[34,-240],[37,-255],[17,-258]]],["",0,"yes",[[-21,-177],[-23,-163],[39,-151],[41,-166]]],["",0,"yes",[[-12,-217],[-15,-202],[45,-191],[48,-206]]],["หอ 15(บ้านกาสลอง)",0,"dormitory",[[-40,439],[-91,431],[-86,406],[-35,413]]],["หอพักเฉลิมพระเกียรติ 14 (อินทนิล)",0,"dormitory",[[-81,442],[-40,449],[-43,464],[-50,463],[-51,471],[-76,468],[-75,459],[-83,458]]],["",0,"dormitory",[[-26,450],[-29,469],[14,476],[19,457]]],["",0,"dormitory",[[-18,407],[-19,422],[22,430],[25,414]]],["",0,"dormitory",[[-13,375],[-15,389],[28,395],[31,381]]],["",0,"dormitory",[[146,369],[213,383],[207,407],[140,392]]],["",0,"dormitory",[[136,402],[204,418],[199,443],[131,428]]],["",0,"yes",[[380,281],[476,283],[471,365],[376,358]]],["",0,"school",[[430,537],[454,542],[437,611],[415,606]]],["",0,"school",[[379,582],[415,593],[411,609],[374,600]]],["",0,"school",[[388,541],[425,550],[415,590],[379,580]]],["",0,"school",[[295,560],[371,580],[367,597],[290,578]]],["",0,"school",[[361,529],[379,533],[372,566],[354,561]]],["",0,"school",[[311,518],[343,526],[340,542],[307,535]]],["",0,"school",[[304,540],[336,547],[332,562],[300,554]]],["",0,"school",[[321,475],[395,494],[390,511],[317,494]]],["",0,"school",[[326,452],[400,468],[397,480],[323,464]]],["",0,"school",[[355,419],[411,432],[408,446],[351,433]]],["",0,"school",[[397,513],[488,534],[492,517],[401,496]]],["",0,"school",[[494,517],[518,523],[514,541],[490,535]]],["",0,"school",[[471,460],[518,469],[511,502],[465,491]]],["",0,"school",[[447,447],[470,452],[464,479],[440,474]]],["",0,"school",[[420,435],[446,441],[442,456],[416,450]]],["",0,"yes",[[598,429],[597,442],[619,444],[621,431],[614,430],[613,433],[605,432],[605,429]]],["",0,"yes",[[579,429],[589,430],[587,446],[578,446]]],["",0,"school",[[488,417],[480,446],[521,455],[529,425]]],["",0,"school",[[413,425],[478,445],[483,430],[417,412]]],["",0,"school",[[451,-163],[448,-117],[474,-116],[476,-163]]],["",0,"school",[[514,-57],[513,-39],[557,-37],[558,-55]]],["",0,"school",[[513,-33],[512,-18],[552,-15],[553,-31]]],["",0,"school",[[510,-11],[509,12],[552,15],[552,-10]]],["",0,"school",[[424,-1],[424,13],[500,17],[501,2]]],["",0,"school",[[435,-29],[435,-17],[501,-13],[501,-26]]],["",0,"school",[[435,-60],[435,-46],[500,-43],[501,-58]]],["",0,"school",[[413,-74],[411,-9],[427,-8],[430,-74]]],["",0,"school",[[428,-92],[506,-90],[505,-71],[428,-76]]],["",0,"school",[[361,-210],[356,-199],[404,-180],[410,-191]]],["",0,"school",[[329,-201],[325,-190],[350,-179],[355,-191]]],["",0,"school",[[347,-176],[341,-160],[385,-143],[392,-159]]],["",0,"school",[[413,-173],[430,-165],[406,-117],[391,-123]]],["",0,"school",[[426,-204],[438,-200],[428,-174],[414,-181]]],["",0,"school",[[344,-240],[361,-231],[350,-205],[331,-213]]],["",0,"school",[[329,-160],[384,-138],[375,-122],[322,-143]]],["",0,"school",[[305,-143],[329,-134],[316,-102],[294,-110]]],["",0,"school",[[368,-64],[406,-51],[401,-27],[361,-40]]],["",0,"school",[[332,-74],[362,-66],[354,-43],[326,-53]]],["",0,"school",[[314,-77],[330,-72],[323,-54],[307,-59]]],["",0,"yes",[[241,-344],[231,-325],[260,-313],[270,-332]]],["",0,"yes",[[263,-395],[258,-381],[295,-364],[303,-379]]],["",0,"yes",[[280,-329],[295,-321],[313,-360],[298,-366]]],["",0,"dormitory",[[394,-295],[426,-279],[431,-289],[424,-291],[426,-295],[400,-307]]],["",0,"dormitory",[[422,-263],[441,-255],[452,-276],[437,-282],[431,-269],[428,-271],[424,-267]]],["",0,"dormitory",[[439,-284],[452,-279],[459,-297],[447,-302]]],["",0,"dormitory",[[407,-321],[432,-310],[426,-297],[401,-309]]],["",0,"yes",[[590,-240],[570,-240],[565,-231],[565,-223],[568,-223],[567,-215],[563,-216],[564,-210],[566,-210],[566,-197],[588,-196]]],["",0,"yes",[[565,-195],[588,-194],[586,-168],[570,-169],[570,-175],[570,-189],[565,-190]]],["",0,"yes",[[549,-196],[538,-178],[565,-167],[570,-175],[568,-187]]],["",0,"yes",[[597,-292],[613,-285],[595,-249],[578,-256]]],["",0,"yes",[[617,-332],[631,-326],[614,-287],[598,-295]]],["",0,"yes",[[598,141],[660,143],[657,203],[595,199]]],["K2",0,"yes",[[577,-627],[594,-617],[567,-577],[549,-587]]],["",0,"yes",[[-206,-515],[-172,-500],[-181,-483],[-214,-498]]],["",0,"yes",[[-171,-498],[-136,-482],[-145,-466],[-179,-483]]],["",0,"yes",[[-129,-477],[-106,-467],[-114,-451],[-136,-462]]],["",0,"yes",[[-104,-466],[-83,-456],[-89,-441],[-111,-451]]],["",0,"yes",[[-3,-367],[-11,-338],[5,-332],[3,-325],[18,-321],[18,-323],[41,-315],[53,-344],[51,-348],[50,-353],[45,-356],[38,-355],[34,-351],[16,-356],[18,-362],[2,-368],[1,-366]]],["",0,"yes",[[-59,-39],[-63,-16],[13,-3],[17,-26]]],["",0,"yes",[[-86,-85],[-91,-59],[-55,-53],[-50,-78]]],["",0,"yes",[[-89,-39],[-92,-21],[-67,-17],[-64,-35]]],["",0,"yes",[[-367,46],[-377,61],[-343,82],[-334,65]]],["",0,"yes",[[-327,69],[-336,85],[-302,106],[-293,89]]],["",0,"yes",[[-287,92],[-296,108],[-263,128],[-253,112]]],["",0,"yes",[[-278,74],[-287,90],[-253,111],[-244,94]]],["",0,"yes",[[-317,51],[-326,67],[-293,87],[-283,70]]],["",0,"yes",[[-356,28],[-365,44],[-331,64],[-322,48]]],["",0,"yes",[[-260,129],[-248,137],[-228,103],[-241,95]]],["",0,"yes",[[-232,174],[-243,191],[-214,209],[-203,191]]],["",0,"yes",[[-182,165],[-202,200],[-187,208],[-172,171],[-178,168]]],["",0,"yes",[[-204,202],[-189,210],[-195,221],[-210,212]]],["",0,"yes",[[-390,73],[-395,81],[-359,102],[-354,93]]],["",0,"yes",[[-350,96],[-355,104],[-319,125],[-314,116]]],["",0,"yes",[[-312,119],[-317,126],[-282,147],[-276,139]]],["",0,"yes",[[-273,142],[-278,150],[-250,167],[-245,158]]],["",0,"yes",[[-380,439],[-340,452],[-347,476],[-387,459]]],["",0,"yes",[[-338,454],[-296,467],[-305,490],[-345,476]]],["",0,"yes",[[-295,467],[-279,473],[-288,496],[-290,495],[-303,490]]],["",0,"yes",[[573,771],[569,783],[596,791],[600,779]]],["",0,"yes",[[535,778],[531,789],[588,809],[593,795]]],["",0,"yes",[[512,789],[524,793],[515,817],[504,813]]],["",0,"yes",[[549,765],[523,758],[519,770],[532,774],[535,769],[547,773]]],["",0,"dormitory",[[285,-621],[301,-616],[294,-593],[278,-598]]],["",0,"dormitory",[[301,-614],[311,-611],[303,-586],[294,-589]]],["",0,"dormitory",[[158,-432],[154,-423],[193,-408],[196,-418]]],["",0,"dormitory",[[177,-470],[169,-453],[189,-446],[197,-462]]],["",0,"yes",[[268,-470],[286,-460],[281,-449],[272,-452],[266,-440],[258,-445]]],["",0,"yes",[[98,-394],[93,-379],[117,-370],[125,-385]]],["",0,"yes",[[267,612],[265,621],[312,636],[315,624]]],["",0,"yes",[[317,626],[315,637],[346,644],[348,634]]],["",0,"yes",[[259,641],[274,645],[259,708],[244,704]]],["",0,"yes",[[276,680],[322,692],[318,705],[272,694]]],["",0,"yes",[[283,647],[277,669],[335,683],[341,659]]],["",0,"yes",[[235,632],[204,625],[213,586],[260,598],[257,610],[224,603],[220,617],[238,621]]],["",0,"yes",[[168,663],[192,668],[203,627],[180,621]]],["",0,"yes",[[228,635],[243,639],[233,674],[219,670]]],["",0,"yes",[[204,630],[216,632],[203,672],[193,669]]],["",0,"yes",[[213,684],[237,689],[227,728],[203,722]]],["",0,"yes",[[275,713],[313,723],[311,731],[273,721]]],["",0,"yes",[[348,687],[360,689],[349,733],[336,729]]],["",0,"yes",[[363,696],[378,700],[362,761],[347,756]]],["",0,"yes",[[-343,220],[-329,227],[-339,245],[-353,236]]],["",0,"yes",[[494,665],[492,673],[517,679],[519,671]]],["",0,"yes",[[469,664],[483,666],[475,698],[460,695],[464,682],[461,681],[463,673],[467,673]]],["",0,"yes",[[342,793],[366,798],[361,821],[337,816]]],["",0,"yes",[[415,788],[449,798],[447,806],[454,808],[453,813],[446,811],[444,819],[411,810]]],["ที่ว่าการอำเภอเมืองอุตรดิตถ์",0,"yes",[[429,720],[459,728],[455,744],[465,747],[462,758],[453,755],[449,771],[418,763]]],["",0,"yes",[[-348,783],[-348,798],[-324,799],[-324,782]]],["",0,"yes",[[547,-299],[581,-284],[573,-268],[540,-284]]],["",0,"yes",[[536,-357],[565,-344],[535,-276],[526,-256],[496,-269]]],["",0,"yes",[[568,-427],[589,-417],[594,-415],[565,-344],[536,-357]]],["",0,"yes",[[597,-434],[645,-413],[629,-377],[591,-396],[599,-412],[589,-417]]],["",0,"yes",[[579,-374],[621,-355],[604,-318],[588,-326],[595,-339],[601,-350],[583,-356],[579,-347],[569,-351]]],["",0,"yes",[[569,-351],[595,-339],[588,-326],[564,-338]]],["",0,"yes",[[535,-276],[553,-267],[542,-239],[522,-249]]],["",0,"yes",[[241,37],[296,45],[293,61],[238,52]]],["",0,"yes",[[237,63],[286,71],[283,95],[234,86]]],["",0,"yes",[[222,87],[245,91],[242,111],[219,107]]],["",0,"yes",[[185,190],[207,194],[207,191],[219,193],[219,196],[232,198],[229,214],[182,206]]],["",0,"yes",[[-5,335],[37,341],[35,353],[-7,347]]],["",0,"house",[[-126,-38],[-113,-35],[-116,-25],[-128,-27]]],["",0,"house",[[-127,-53],[-114,-51],[-116,-42],[-129,-44]]],["",0,"house",[[-122,-67],[-109,-65],[-110,-56],[-123,-58]]],["",0,"house",[[-117,-81],[-104,-79],[-106,-70],[-119,-72]]],["",0,"house",[[-109,-94],[-96,-92],[-98,-83],[-111,-85]]],["",0,"house",[[-104,-107],[-91,-105],[-93,-96],[-105,-98]]],["",0,"house",[[-100,-135],[-87,-133],[-88,-124],[-101,-126]]],["",0,"house",[[-98,-149],[-85,-146],[-86,-137],[-99,-140]]],["",0,"house",[[-95,-163],[-82,-160],[-84,-151],[-97,-154]]],["",0,"house",[[-81,-173],[-68,-171],[-70,-162],[-83,-164]]],["",0,"house",[[-67,-181],[-54,-178],[-56,-169],[-69,-172]]],["",0,"house",[[-52,-188],[-39,-185],[-41,-176],[-54,-179]]],["",0,"house",[[-36,-222],[-23,-220],[-25,-211],[-38,-213]]],["",0,"house",[[-33,-237],[-20,-234],[-21,-225],[-34,-228]]],["",0,"house",[[-29,-250],[-17,-248],[-18,-239],[-31,-241]]],["",0,"house",[[-26,-264],[-13,-262],[-15,-253],[-28,-255]]],["",0,"house",[[-24,-278],[-11,-276],[-13,-267],[-26,-269]]],["",0,"house",[[-21,-292],[-8,-290],[-9,-281],[-22,-283]]],["",0,"house",[[-19,-307],[-6,-304],[-7,-295],[-20,-298]]],["",0,"yes",[[-35,-75],[-7,-70],[-8,-63],[-12,-46],[-40,-51]]],["",0,"yes",[[24,-57],[22,-42],[-12,-46],[-8,-63]]],["",0,"dormitory",[[-398,-181],[-386,-179],[-386,-174],[-382,-173],[-385,-149],[-401,-152]]],["",0,"yes",[[-382,-187],[-343,-175],[-350,-157],[-377,-168],[-377,-172],[-384,-174]]],["",0,"yes",[[219,-138],[274,-135],[274,-121],[266,-122],[266,-117],[258,-118],[259,-122],[235,-124],[233,-119],[226,-120],[226,-124],[217,-125]]],["",0,"yes",[[230,-100],[230,-90],[259,-87],[261,-103],[249,-103],[248,-99]]],["",0,"yes",[[262,-268],[257,-255],[327,-225],[331,-237]]],["",0,"yes",[[271,-229],[257,-229],[256,-212],[235,-213],[234,-198],[270,-195]]],["",0,"yes",[[325,-223],[314,-228],[307,-212],[288,-218],[282,-206],[314,-192]]],["",0,"yes",[[243,-189],[287,-187],[286,-165],[241,-167]]],["",0,"yes",[[98,45],[114,47],[113,52],[119,53],[118,59],[113,58],[112,64],[96,62],[97,58],[92,57],[94,50],[98,50]]],["",0,"yes",[[138,134],[127,132],[125,138],[102,135],[101,144],[123,148],[121,158],[134,160]]],["",0,"yes",[[103,156],[138,163],[135,180],[127,180],[125,190],[97,186]]],["",0,"yes",[[-447,-36],[-398,-37],[-402,-20],[-448,-20]]],["",0,"yes",[[-389,-85],[-344,-69],[-348,-57],[-392,-72]]],["",0,"yes",[[-249,-88],[-230,-84],[-232,-70],[-251,-75]]],["",0,"yes",[[-389,-374],[-405,-348],[-392,-338],[-375,-365]]],["",0,"yes",[[-391,-417],[-402,-398],[-424,-408],[-411,-428]]],["",0,"yes",[[-375,-444],[-389,-420],[-413,-431],[-399,-456]]],["",0,"yes",[[-362,-532],[-369,-519],[-338,-505],[-332,-518]]],["",0,"yes",[[-354,-509],[-341,-503],[-350,-489],[-363,-496]]],["",0,"yes",[[-363,-489],[-351,-483],[-370,-450],[-383,-455]]],["",0,"yes",[[334,149],[348,149],[345,191],[331,190]]],["",0,"yes",[[356,148],[370,148],[367,191],[353,191]]],["",0,"yes",[[391,151],[406,152],[403,211],[389,210]]],["",0,"yes",[[373,158],[386,159],[383,215],[369,214]]],["",0,"yes",[[518,180],[544,183],[544,212],[523,210],[524,195],[517,195]]],["",0,"yes",[[314,374],[314,384],[342,387],[343,377]]],["",0,"yes",[[288,360],[287,372],[309,375],[310,361]]],["",0,"yes",[[298,298],[320,299],[316,332],[295,329]]],["",0,"yes",[[-393,386],[-402,409],[-362,423],[-355,407],[-374,399],[-371,390],[-383,380],[-386,387]]],["",0,"yes",[[-354,408],[-359,424],[-335,433],[-330,420]]],["",0,"yes",[[-328,423],[-331,434],[-315,440],[-313,433]]],["",0,"yes",[[159,267],[173,269],[163,328],[149,325]]],["",0,"yes",[[-204,306],[-188,315],[-210,351],[-226,342]]],["",0,"yes",[[-423,198],[-429,209],[-398,228],[-390,216]]],["",0,"yes",[[39,-414],[36,-402],[63,-393],[70,-413],[65,-414],[61,-407]]],["",0,"yes",[[73,-413],[67,-392],[92,-383],[97,-398],[77,-404],[79,-411]]],["",0,"dormitory",[[-130,-545],[-135,-519],[-114,-512],[-108,-546],[-128,-551]]],["",0,"dormitory",[[-188,-284],[-195,-265],[-224,-276],[-215,-295]]],["",0,"dormitory",[[-188,-259],[-191,-250],[-164,-244],[-161,-254]]],["",0,"yes",[[-351,758],[-349,771],[-331,767],[-335,754]]],["",0,"yes",[[344,-291],[337,-279],[355,-270],[361,-283]]],["7-Eleven",0,"yes",[[376,-276],[371,-267],[378,-263],[383,-272]]],["",0,"yes",[[204,-348],[200,-337],[223,-327],[228,-338]]],["",0,"yes",[[131,-376],[140,-373],[135,-361],[125,-365]]],["",0,"dormitory",[[157,-548],[178,-540],[171,-524],[151,-532]]],["",0,"dormitory",[[183,-539],[202,-533],[196,-516],[177,-522]]],["",0,"dormitory",[[166,-512],[160,-500],[178,-493],[184,-506]]],["",0,"yes",[[131,-481],[126,-469],[161,-456],[166,-468]]],["",0,"yes",[[125,-466],[121,-456],[153,-442],[158,-454]]],["",0,"yes",[[201,-348],[169,-361],[164,-350],[197,-338]]],["",0,"yes",[[228,-373],[242,-366],[230,-341],[216,-346]]],["",0,"yes",[[237,-405],[254,-398],[244,-374],[226,-382]]],["",0,"yes",[[252,-421],[266,-417],[258,-402],[246,-408]]],["",0,"yes",[[-429,-140],[-429,-124],[-388,-125],[-389,-142]]],["",0,"yes",[[-329,-180],[-312,-173],[-317,-157],[-335,-164]]],["",0,"yes",[[348,-569],[352,-588],[374,-583],[368,-560]]],["",0,"yes",[[-72,-460],[-83,-460],[-85,-439],[-74,-438]]],["",0,"dormitory",[[-125,-381],[-110,-375],[-116,-358],[-130,-362]]],["",0,"yes",[[-154,-438],[-134,-430],[-140,-414],[-160,-423]]],["",0,"yes",[[-346,641],[-344,623],[-330,624],[-331,643]]],["",0,"yes",[[359,378],[380,379],[379,392],[359,391]]],["",0,"yes",[[394,363],[414,364],[413,385],[394,384]]],["",0,"yes",[[382,379],[392,380],[391,393],[382,393]]],["",0,"dormitory",[[-274,-136],[-249,-131],[-251,-120],[-276,-125]]],["",0,"dormitory",[[-328,-9],[-348,-13],[-354,15],[-336,19],[-335,13],[-341,12],[-338,-4],[-330,-3]]],["",0,"yes",[[-89,129],[-103,126],[-105,131],[-110,129],[-113,139],[-93,144]]],["",0,"yes",[[-338,335],[-322,344],[-333,364],[-350,354]]]],
+"h":[["re","",[[-222,660],[-266,664],[-242,744],[-198,746],[-160,739]]],["se","",[[596,-144],[598,-202],[598,-222],[599,-236],[605,-250],[625,-290]]],["se","ถนนประชานิมิตร",[[598,-114],[596,-135]]],["se","ถนนอินใจมี",[[-11,-408],[10,-401],[119,-364],[207,-331],[225,-324],[267,-308],[311,-288],[330,-278],[407,-240],[430,-228],[446,-220],[518,-183],[534,-175],[596,-144],[605,-140]]],["se","ถนนประชานิมิตร",[[604,-131],[598,-114]]],["se","ถนนอินใจมี",[[-49,-411],[-82,-423],[-124,-439],[-181,-463]]],["se","ถนนอินใจมี",[[-48,-420],[-11,-408]]],["se","ถนนอินใจมี",[[-498,-607],[-455,-588],[-444,-583],[-405,-566],[-357,-545],[-346,-540],[-316,-526],[-279,-510]]],["se","ถนนอินใจมี",[[-14,-399],[-49,-411]]],["re","ถนนอินใจมี ซอย2",[[559,-678],[503,-609],[482,-584],[463,-560],[453,-536],[442,-514],[385,-393],[359,-338],[330,-278]]],["re","",[[453,-536],[492,-517],[533,-496],[558,-484],[664,-430]]],["re","",[[231,-694],[209,-627],[182,-542],[173,-520]]],["re","ถนนอินใจมี ซอย3",[[339,-568],[310,-506],[291,-465],[269,-419],[247,-370],[225,-324]]],["re","",[[217,-504],[255,-604]]],["re","",[[255,-604],[273,-596],[339,-568],[358,-559]]],["re","",[[173,-520],[192,-513],[217,-504],[251,-490],[291,-465]]],["re","",[[273,-596],[296,-675],[231,-694]]],["re","ถนนอินใจมี ซอย 1/2",[[664,-430],[576,-256],[552,-210],[534,-175]]],["re","",[[221,527],[215,567]]],["se","",[[368,-481],[310,-506],[262,-524]]],["se","",[[24,16],[19,57],[11,111],[7,141],[-15,306],[-21,354],[-28,406],[-33,444],[-36,471],[-25,477],[10,483]]],["se","",[[544,-587],[595,-658]]],["re","",[[503,-609],[544,-587],[583,-565],[608,-551]]],["se","",[[182,48],[216,51],[230,45],[237,33],[242,13],[246,-2],[255,-33],[261,-58],[264,-77],[269,-102],[287,-113],[295,-122],[337,-245]]],["re","",[[479,401],[353,396]]],["re","",[[290,233],[357,238],[488,242]]],["re","",[[357,238],[356,280],[353,396]]],["se","",[[415,428],[404,467],[392,514],[376,569],[368,600],[367,604]]],["re","",[[488,242],[482,346],[479,401]]],["se","",[[306,493],[392,514]]],["se","",[[323,426],[306,493]]],["se","",[[110,500],[116,447],[127,392],[135,342],[156,219],[170,135],[172,123],[177,93],[182,48],[154,43]]],["se","",[[215,-328],[196,-244],[190,-213],[184,-181],[175,-133],[172,-118],[166,-100],[165,-110]]],["re","",[[-291,-194],[-247,-285],[-230,-309],[-223,-330],[-171,-308],[-119,-286]]],["se","",[[-107,-8],[-118,33],[-116,57],[-107,70],[-103,90],[-91,113],[-77,127],[-49,135],[7,141]]],["se","",[[7,-321],[0,-286],[-21,-186],[-26,-170],[-39,-160],[49,-145]]],["re","",[[-117,271],[-144,255],[-371,120]]],["re","",[[-207,-372],[-156,-350],[-107,-330]]],["re","ถนนเจษฎาบดินทร์ ซอย 6/2",[[-198,746],[-222,660],[-228,635],[-226,617],[-219,587],[-312,556],[-354,550],[-382,548]]],["re","ถนนเจษฎาบดินทร์ ซอย 7",[[-296,445],[-313,431],[-398,365]]],["re","ถนนเจษฎาบดินทร์ ซอย 9",[[-235,391],[-394,294]]],["re","",[[-386,642],[-359,743],[-356,767],[-354,774]]],["re","ถนนเจษฎาบดินทร์ ซอย 15",[[-346,-54],[-390,-67],[-400,-17],[-457,-16]]],["re","",[[-175,-410],[-140,-395],[-97,-377]]],["re","ถนนเจษฎาบดินทร์ ซอย 19",[[-291,-194],[-268,-189],[-235,-183],[-220,-184],[-190,-262],[-180,-288],[-171,-308],[-156,-350],[-140,-395],[-124,-439]]],["re","ถนนเจษฎาบดินทร์ ซอย 12",[[-157,331],[-203,299],[-388,189]]],["re","ถนนเจษฎาบดินทร์ ซอย 10",[[-203,299],[-225,333],[-371,247]]],["re","",[[-226,617],[-324,595],[-312,556]]],["un","",[[-190,464],[-156,467],[-75,494],[65,527],[102,537],[215,567],[367,604],[522,644],[535,653]]],["se","ถนนประชานิมิตร",[[497,805],[515,738],[520,719],[535,653],[567,448],[571,406],[580,245],[581,224],[582,201],[583,186],[585,149],[585,122],[590,37],[591,20],[594,-30],[596,-70],[598,-114]]],["re","",[[-276,-576],[-198,-539],[-159,-522],[-119,-504],[-106,-498],[-86,-489]]],["re","",[[-221,-489],[-198,-539],[-150,-645]]],["re","",[[-158,-670],[-170,-654],[-186,-639],[-259,-588],[-276,-576],[-298,-555],[-316,-526]]],["re","",[[-159,-522],[-113,-627]]],["re","",[[-141,-455],[-119,-504]]],["re","",[[-288,-628],[-259,-588]]],["re","",[[-320,-88],[-298,-83],[-269,-76],[-242,-69],[-230,-67],[-215,-64]]],["re","",[[-220,-184],[-204,-178],[-230,-67]]],["re","",[[-274,36],[-242,-69]]],["re","",[[-303,16],[-295,-6],[-269,-76]]],["re","",[[-258,-73],[-235,-183]]],["re","",[[-331,17],[-298,-83]]],["re","",[[-292,-81],[-286,-99],[-268,-189]]],["re","",[[-160,739],[-139,736]]],["un","ถนนจิตรเพลิน",[[11,744],[115,770],[164,782],[212,794],[317,822]]],["re","",[[303,130],[349,133],[416,137],[455,140],[486,142],[585,149]]],["re","",[[303,130],[295,203],[290,233],[282,277],[271,335],[264,390],[250,465],[244,500],[226,520],[221,527]]],["re","",[[-9,-398],[-23,-352],[-31,-331]]],["re","ถนนเจษฎาบดินทร์ ซอย 6/3",[[-355,513],[-437,505]]],["re","ถนนเจษฎาบดินทร์ ซอย 6/1",[[-348,592],[-462,591]]],["re","ถนนเจษฎาบดินทร์ ซอย 6",[[-362,642],[-386,642],[-410,642],[-479,638]]],["re","ถนนเจษฎาบดินทร์ ซอย 23",[[-433,-434],[-444,-416],[-394,-388]]],["re","",[[73,-674],[67,-656],[61,-638],[21,-541],[9,-514],[4,-502],[-3,-416]]],["se","",[[135,-677],[126,-652],[120,-634],[114,-616],[57,-473],[28,-484],[3,-494]]],["se","",[[317,25],[350,21],[373,22],[376,61],[374,68]]],["re","",[[330,736],[233,712]]],["se","",[[-281,-381],[-246,-435],[-216,-479]]],["se","",[[233,712],[237,689],[239,674],[253,624],[263,587]]],["re","",[[26,664],[-50,648]]],["re","",[[-203,78],[-189,54]]],["se","",[[-361,-448],[-394,-465],[-418,-426]]],["re","",[[-203,78],[-216,97],[-244,148]]],["re","",[[486,142],[482,197]]],["se","",[[-28,575],[-24,539],[-10,538],[36,547],[48,553],[47,569]]],["se","",[[-15,306],[135,342]]],["re","",[[175,-480],[144,-493]]],["se","",[[179,83],[19,57]]],["re","",[[-235,391],[-219,463]]],["re","",[[136,681],[130,712],[124,734],[115,770]]],["re","",[[-173,619],[-226,617]]],["re","",[[-313,675],[-297,738],[-292,782],[-288,823],[-124,834],[-81,827],[-71,827]]],["se","",[[362,459],[404,467]]],["re","",[[512,-73],[512,-98],[515,-176]]],["re","",[[512,-73],[511,-28]]],["re","",[[602,-244],[576,-256]]],["se","",[[11,111],[34,116],[73,126]]],["se","",[[467,77],[473,34]]],["se","",[[-28,575],[-46,615],[-47,627],[-50,641],[-50,648]]],["se","",[[358,611],[347,648],[337,685],[331,714],[330,736]]],["re","",[[512,-98],[458,-98],[443,-99],[447,-171],[448,-185]]],["re","",[[583,-565],[533,-496]]],["re","",[[-347,-185],[-400,-202],[-409,-154]]],["re","",[[574,-69],[572,-46],[572,-5]]],["se","",[[-28,575],[-12,574],[12,579],[32,584],[47,569]]],["re","",[[191,721],[178,732],[164,782]]],["un","",[[-279,458],[-258,462],[-219,463],[-215,463]]],["se","",[[167,-120],[208,-113],[246,-111],[260,-110],[270,-110]]],["se","",[[39,640],[-47,627]]],["re","",[[544,-587],[492,-517]]],["re","",[[136,681],[104,675],[79,673],[34,665],[26,664]]],["re","",[[596,-70],[574,-69],[512,-73],[460,-76]]],["se","",[[233,712],[212,794]]],["re","",[[-294,-637],[-321,-586],[-346,-540]]],["re","",[[11,744],[18,715],[26,675],[26,664]]],["se","",[[415,428],[477,450],[541,461]]],["se","",[[216,363],[135,342]]],["re","",[[-362,642],[-322,646]]],["se","",[[-364,-502],[-339,-488]]],["re","ถนนเจษฎาบดินทร์ ซอย 21",[[-434,-317],[-332,-256]]],["se","",[[7,-321],[55,-315],[77,-317]]],["se","",[[337,685],[275,674]]],["re","",[[-386,69],[-358,22],[-315,42],[-296,52],[-275,64],[-236,83],[-216,97]]],["re","",[[269,-419],[211,-440],[202,-444]]],["re","",[[558,-484],[608,-551],[660,-621]]],["se","",[[376,569],[292,548],[306,493]]],["re","",[[-128,309],[-123,293],[-117,271],[-115,259],[-139,185],[-163,156],[-170,144],[-194,97],[-205,83]]],["se","",[[553,35],[527,34],[524,81],[467,77],[430,74],[402,71],[378,69],[313,61],[317,25]]],["se","",[[549,118],[531,121],[524,81]]],["re","",[[-189,54],[-180,46],[-172,43]]],["re","",[[-180,-288],[-230,-309]]],["se","",[[156,219],[197,226],[224,225],[237,228],[216,363],[216,389],[211,404],[205,434],[194,517],[110,500]]],["re","",[[128,-457],[157,-444]]],["tr","",[[31,-675],[28,-662],[23,-651],[11,-637],[-34,-609],[-45,-597],[-49,-572],[-46,-520],[-45,-486],[-46,-469],[-53,-421]]],["un","",[[-215,463],[-190,464]]],["re","",[[83,728],[18,715],[-47,702],[-58,696],[-61,678],[-57,662],[-50,648]]],["re","",[[136,681],[166,687]]],["se","",[[467,77],[461,112],[460,135],[460,140]]],["re","",[[-92,-617],[-106,-498]]],["re","ถนนเจษฎาบดินทร์ ซอย 22",[[-341,-313],[-412,-357]]],["re","",[[-208,174],[-244,148],[-303,114],[-318,105],[-344,92],[-386,69],[-455,33]]],["se","ถนนอินใจมี",[[604,-131],[515,-176],[427,-220],[327,-271],[308,-280],[264,-301],[213,-320],[137,-349],[85,-368],[-9,-398],[-14,-399]]],["se","ถนนอินใจมี",[[-178,-471],[-141,-455],[-121,-447],[-79,-430],[-53,-421]]],["re","",[[-190,470],[-181,492],[-162,521],[-150,532],[-136,541],[-108,552],[-93,567],[-91,589],[-93,603],[-105,621],[-113,631],[-124,651],[-136,674],[-142,688],[-139,703],[-135,735]]],["re","",[[-74,500],[-78,516],[-80,535],[-93,567]]],["re","",[[-117,486],[-126,515],[-136,541]]],["re","",[[-296,445],[-279,458]]],["un","",[[-190,470],[-215,469]]],["un","",[[535,653],[519,653],[460,638],[358,611],[263,587],[63,536],[-46,509],[-74,500],[-117,486],[-156,473],[-190,470]]],["un","",[[65,527],[63,536]]],["un","",[[-215,469],[-258,469],[-279,466],[-294,462],[-325,453],[-337,449],[-364,440],[-391,431],[-406,433],[-428,436],[-441,436]]],["re","",[[-123,293],[-147,283],[-146,259]]],["se","",[[-439,770],[-366,767],[-356,767]]],["re","",[[-357,-545],[-383,-499],[-397,-474],[-410,-480]]],["se","",[[-281,-381],[-234,-350]]],["re","",[[-190,-262],[-155,-254],[-125,-249]]],["se","",[[264,-77],[205,-91],[192,-94]]],["se","",[[184,-181],[199,-179],[209,-163]]],["se","",[[253,624],[277,631],[302,638],[326,644],[347,648]]],["se","",[[581,224],[558,221],[536,212],[506,212]]],["se","",[[506,212],[506,184],[515,169],[530,169],[546,171],[548,193],[549,216]]],["se","",[[594,-30],[606,-28],[619,-25],[644,-15],[666,-18],[685,-26],[699,-44]]],["se","",[[216,189],[216,170],[210,151],[209,130]]],["se","",[[246,120],[221,130],[203,131],[172,123]]],["se","",[[177,93],[203,104],[224,113],[241,119],[246,120]]],["se","",[[428,74],[429,48]]],["se","",[[402,71],[407,25]]],["se","",[[378,69],[372,82],[368,107]]],["se","",[[127,392],[210,410]]],["re","",[[458,676],[434,671],[419,665],[405,654],[385,648],[374,643]]],["re","",[[455,696],[458,676],[462,660],[489,665],[478,707]]],["re","",[[520,719],[485,709],[472,706],[461,700],[450,692],[431,683],[434,671]]],["re","",[[453,789],[459,769],[470,749],[478,728]]],["re","",[[478,728],[463,726],[427,717],[401,723],[376,723],[367,758],[383,768],[401,773],[422,781],[453,789]]],["re","",[[416,137],[414,184],[414,217]]],["re","",[[341,199],[358,211]]],["re","",[[358,211],[358,197],[341,199],[330,194],[328,174]]],["re","",[[352,133],[349,195]]],["re","",[[282,277],[356,280]]],["se","",[[-107,-8],[-107,-31],[-108,-50],[-106,-67],[-91,-98],[-54,-89],[-39,-160]]],["se","",[[-39,-160],[-59,-163],[-74,-146],[-79,-134],[-84,-119],[-91,-98]]],["se","",[[331,717],[295,711],[267,701],[275,674]]],["se","",[[196,711],[205,675],[238,678]]],["re","",[[427,-220],[406,-172],[386,-124],[365,-70],[350,-13],[388,-8]]],["se","",[[549,118],[550,86],[553,35]]],["se","",[[92,126],[85,157],[75,204],[23,193],[34,116]]],["se","",[[170,135],[110,126],[98,125],[73,126]]],["re","",[[-72,632],[-105,621]]],["re","",[[-90,573],[-65,577],[-69,611],[-72,632],[-76,654],[-80,680],[-77,705],[-76,721],[-76,733]]],["se","",[[157,-60],[188,-55],[204,-48],[230,-40],[255,-33]]],["se","",[[461,112],[481,115],[501,118],[520,121],[526,121]]],["re","",[[-52,-412],[-53,-394],[-58,-368],[-64,-348],[-71,-328],[-75,-309],[-79,-288]]],["se","",[[-64,-505],[-69,-427]]],["se","",[[21,-264],[67,-256]]],["re","",[[-10,-417],[-8,-464],[-6,-486],[-4,-499],[0,-518],[13,-544],[52,-649]]],["re","",[[183,-214],[190,-213]]],["se","",[[165,-110],[168,-127],[178,-182],[183,-214],[188,-245],[199,-301],[204,-323],[207,-331]]],["se","",[[197,-400],[205,-388],[247,-370]]],["se","",[[446,-220],[487,-301]]],["re","",[[365,-427],[357,-408],[385,-393]]],["se","",[[208,-113],[212,-143]]],["re","",[[451,206],[455,140]]],["re","",[[350,-13],[328,-14],[307,-15],[295,-18],[302,-57],[313,-83],[365,-70]]],["se","",[[116,447],[189,457]]],["se","",[[596,-135],[596,-144]]],["re","",[[11,744],[9,837]]],["se","",[[585,122],[572,121],[549,118]]],["se","",[[553,35],[578,37],[590,37]]],["re","",[[398,-537],[419,-526],[442,-514]]],["se","",[[49,-145],[67,-256],[77,-317]]],["se","",[[24,16],[135,36],[142,37]]],["se","",[[166,-100],[157,-60],[144,33],[142,37]]],["se","",[[-183,-473],[-186,-465]]],["se","ถนนอินใจมี",[[-186,-465],[-216,-479],[-271,-502],[-279,-510]]],["se","ถนนอินใจมี",[[-181,-463],[-186,-465]]],["se","ถนนอินใจมี",[[-279,-510],[-221,-489],[-183,-473]]],["se","ถนนอินใจมี",[[-183,-473],[-178,-471]]],["se","",[[-33,444],[-57,441]]],["se","",[[-28,406],[-65,399]]],["se","",[[-252,-318],[-262,-304],[-270,-291],[-278,-278]]],["se","",[[-292,-323],[-262,-304]]],["se","",[[-270,-291],[-301,-309],[-292,-323]]],["se","",[[-278,-278],[-309,-296],[-301,-309]]],["se","",[[-186,-465],[-214,-431]]],["se","",[[-344,92],[-315,42]]],["se","",[[-303,114],[-275,64]]],["re","",[[571,406],[519,403],[479,401]]],["re","",[[488,242],[529,244],[580,245]]],["se","",[[519,403],[521,349],[495,347],[482,346]]],["se","",[[495,347],[493,390],[519,391]]],["se","",[[528,263],[526,306],[499,304],[501,262],[528,263]]],["se","",[[154,43],[134,42],[23,22]]],["se","",[[144,33],[146,37]]],["se","",[[146,37],[154,43]]],["se","",[[246,120],[270,128],[284,129]]],["se","",[[77,-317],[85,-368]]],["re","",[[-135,427],[-153,410],[-166,399],[-178,394],[-190,399],[-192,411],[-189,425],[-185,440],[-190,464]]],["re","",[[-156,467],[-156,473]]],["re","",[[-362,431],[-364,440]]],["se","",[[-284,-337],[-301,-349]]],["se","",[[-252,-318],[-284,-337]]],["se","",[[-234,-350],[-246,-328],[-252,-318]]],["se","",[[-246,-328],[-282,-349],[-274,-363],[-239,-341]]],["se","",[[110,500],[102,537]]],["se","",[[-121,-447],[-124,-439]]],["se","",[[-31,-331],[7,-321]]],["se","",[[24,16],[49,-145]]],["se","",[[49,-145],[167,-120]]],["se","",[[407,-240],[419,-265],[434,-289]]],["re","",[[462,660],[460,638]]],["se","",[[317,822],[333,749],[330,736]]],["re","",[[497,805],[477,796],[453,789]]],["re","",[[478,728],[515,738]]],["se","",[[529,244],[528,263]]],["re","",[[264,390],[353,396]]],["re","",[[-290,495],[-304,490],[-346,476],[-383,463],[-396,439],[-402,432]]],["re","",[[-31,-331],[-38,-304],[-48,-252],[-52,-232],[-57,-220],[-70,-204],[-108,-181],[-118,-173],[-126,-156],[-141,-82],[-158,-17]]],["re","ถนนอินใจมี ซอย4",[[192,-513],[183,-495],[175,-480],[157,-444],[119,-364]]],["re","ถนนเจษฎาบดินทร์ ซอย 19",[[-458,-276],[-377,-236],[-302,-194],[-291,-194]]],["re","ถนนเจษฎาบดินทร์ ซอย 13",[[-371,120],[-454,71]]],["re","ถนนเจษฎาบดินทร์ ซอย 12",[[-388,189],[-451,154]]],["re","ถนนเจษฎาบดินทร์ ซอย 10",[[-371,247],[-449,203]]],["re","ถนนเจษฎาบดินทร์ ซอย 9",[[-394,294],[-408,285],[-447,265]]],["re","ถนนเจษฎาบดินทร์ ซอย 7",[[-398,365],[-444,329]]],["re","ถนนเจษฎาบดินทร์ ซอย 6/2",[[-382,548],[-396,546],[-446,543]]],["se","",[[327,-271],[330,-278]]],["se","",[[427,-220],[430,-228]]],["se","",[[515,-176],[518,-183]]],["re","",[[-53,-421],[-52,-412]]],["se","ถนนอินใจมี",[[-53,-421],[-48,-420]]],["un","",[[-139,736],[-125,734],[-76,733],[-61,733],[11,744]]],["re","",[[-159,-11],[-168,21],[-171,36],[-166,59],[-153,82],[-133,117],[-106,163],[-100,176],[-96,192],[-82,253],[-81,266],[-83,284],[-92,307],[-97,322],[-93,341],[-87,355],[-86,377],[-91,388],[-102,400],[-135,427],[-154,458],[-156,467]]],["re","",[[-158,-17],[-159,-11]]],["re","",[[-3,-416],[10,-401]]],["re","",[[-7,-410],[-10,-417]]],["re","",[[-3,-416],[-7,-410]]],["re","",[[-7,-410],[-9,-398]]],["re","",[[419,-526],[434,-556]]],["se","",[[-292,-323],[-284,-337]]],["se","",[[-278,-278],[-285,-268]]],["se","",[[-301,-349],[-281,-381]]],["se","",[[-332,-256],[-319,-252],[-303,-252],[-285,-268]]],["se","",[[-183,-473],[-159,-522]]],["se","",[[-346,476],[-337,449]]],["se","",[[-304,490],[-294,462]]],["se","",[[-21,354],[28,362]]],["se","",[[-158,-17],[-107,-8],[24,16]]],["se","",[[23,22],[-108,-2],[-159,-11]]],["se","",[[284,129],[303,130]]],["un","",[[682,688],[535,653]]],["un","",[[-441,436],[-427,427],[-409,424],[-391,424],[-374,427],[-362,431],[-303,452],[-279,458]]],["te","ถนนเจษฎาบดินทร์",[[-441,436],[-444,329],[-446,277],[-447,265],[-448,235],[-449,203],[-451,154],[-454,71],[-455,33],[-457,-16],[-459,-67],[-462,-148],[-462,-161],[-464,-220],[-462,-256],[-458,-276],[-442,-301],[-434,-317],[-412,-357],[-394,-388],[-361,-448],[-339,-488],[-316,-526]]]],
+"l":[["track","",[[96,-272],[106,-296],[122,-309],[142,-310],[164,-305],[175,-290],[178,-274],[163,-173],[150,-157],[133,-150],[112,-151],[96,-158],[85,-173],[83,-189],[96,-272]]],["park","สวนมหามงคล",[[591,194],[721,202],[726,-44],[706,-70],[624,-113],[604,-131],[591,20],[583,186],[591,194]]],["park","อนุสาวรีย์พระยาพิชัยดาบหัก",[[488,242],[482,346],[479,401],[519,403],[571,406],[580,245],[529,244],[488,242]]],["pitch","สนามกีฬาพระยาพิชัยดาบหัก",[[582,201],[581,224],[571,406],[714,416],[726,210],[582,201]]],["park","",[[37,356],[116,369],[112,391],[96,496],[90,518],[13,498],[37,356]]],["park","",[[456,548],[530,567],[518,622],[443,602],[456,548]]],["park","",[[519,-145],[560,-128],[558,-76],[515,-78],[519,-145]]],["track","",[[38,377],[51,370],[64,367],[76,366],[89,370],[101,380],[109,392],[93,489],[84,501],[71,507],[59,508],[47,505],[36,500],[26,492],[19,482],[38,377]]],["pitch","",[[485,-162],[500,-162],[499,-135],[484,-135],[485,-162]]],["pitch","",[[476,-132],[501,-132],[500,-108],[474,-109],[476,-132]]],["park","",[[92,-348],[194,-309],[162,-129],[59,-150],[92,-348]]]],
+"w":[["",[[-22,-420],[-17,-570],[-7,-587],[18,-610],[33,-626],[40,-643],[45,-658],[60,-778],[40,-779],[38,-739],[37,-714],[39,-684],[36,-660],[27,-641],[12,-631],[-4,-624],[-27,-609],[-38,-602],[-44,-585],[-38,-480],[-42,-446],[-40,-426],[-56,-348],[-63,-320],[-68,-293],[-68,-276],[-68,-260],[-75,-234],[-86,-220],[-113,-212],[-136,-195],[-161,-174],[-167,-160],[-165,-147],[-155,-125],[-156,-108],[-164,-92],[-182,-69],[-194,-51],[-191,-36],[-186,-21],[-185,-9],[-199,23],[-212,47],[-204,62],[-147,166],[-124,189],[-121,204],[-115,230],[-108,259],[-110,278],[-112,297],[-116,321],[-114,342],[-111,356],[-108,370],[-111,385],[-125,391],[-144,387],[-162,376],[-180,366],[-205,367],[-219,384],[-216,458],[-194,457],[-203,404],[-191,387],[-179,383],[-168,388],[-156,398],[-140,405],[-123,407],[-107,399],[-100,388],[-95,376],[-102,340],[-102,314],[-96,300],[-94,281],[-93,267],[-95,245],[-99,230],[-106,211],[-109,191],[-114,177],[-143,127],[-171,84],[-184,66],[-197,46],[-184,29],[-174,7],[-169,-14],[-166,-35],[-157,-75],[-145,-108],[-141,-142],[-137,-159],[-128,-174],[-113,-186],[-81,-204],[-67,-220],[-61,-241],[-50,-290],[-28,-390],[-22,-420]]],["",[[177,275],[201,280],[192,330],[168,327],[177,275]]],["",[[206,-162],[197,-170],[183,-137],[192,-128],[204,-132],[205,-144],[202,-162],[206,-162]]],["",[[-81,31],[-58,35],[-26,36],[-33,80],[-88,72],[-81,31]]],["",[[-216,482],[-194,481],[-189,498],[-181,512],[-172,521],[-163,530],[-148,543],[-130,554],[-111,562],[-101,573],[-99,598],[-105,610],[-115,622],[-124,631],[-129,645],[-143,660],[-156,668],[-153,682],[-150,697],[-142,733],[-162,736],[-164,710],[-171,684],[-180,670],[-185,652],[-176,639],[-156,635],[-140,628],[-134,616],[-124,603],[-119,591],[-122,577],[-144,564],[-158,556],[-176,540],[-192,524],[-216,482]]],["",[[-141,741],[-138,759],[-133,771],[-120,777],[-104,775],[-88,769],[-68,768],[-59,791],[-57,808],[-59,823],[-73,823],[-75,805],[-76,793],[-92,783],[-105,788],[-123,789],[-136,787],[-157,743],[-141,741]]]]};
+
+</script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const LAT0=17.63259, LON0=100.09226, KY=111320, KX=111320*Math.cos(LAT0*Math.PI/180);
+const toLL=(x,z)=>[LAT0 - z/KY, LON0 + x/KX];
+const gm=(x,z)=>{const [a,b]=toLL(x,z);return `https://www.google.com/maps/search/?api=1&query=${a.toFixed(6)},${b.toFixed(6)}`};
+const sv=(x,z)=>{const [a,b]=toLL(x,z);return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${a.toFixed(6)},${b.toFixed(6)}`};
+const MOBILE=matchMedia('(max-width:820px)').matches||(('ontouchstart' in window)&&innerWidth<1100);
+const REDUCED=matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+/* ---------- math helpers ---------- */
+let seed=20261015;const R=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const smooth=(a,b,v)=>{const t=clamp((v-a)/(b-a),0,1);return t*t*(3-2*t)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+function centroid(g){let x=0,z=0;g.forEach(p=>{x+=p[0];z+=p[1]});return [x/g.length,z/g.length]}
+function area(g){let a=0;for(let i=0;i<g.length;i++){const p=g[i],q=g[(i+1)%g.length];a+=p[0]*q[1]-q[0]*p[1]}return Math.abs(a/2)}
+function inside(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];
+  if(((a[1]>pt[1])!==(b[1]>pt[1]))&&(pt[0]<(b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1])+a[0]))c=!c}return c}
+function bbox(g){let a=[1e9,1e9,-1e9,-1e9];g.forEach(p=>{a[0]=Math.min(a[0],p[0]);a[1]=Math.min(a[1],p[1]);a[2]=Math.max(a[2],p[0]);a[3]=Math.max(a[3],p[1])});return a}
+function shapeOf(g){const s=new THREE.Shape();g.forEach((p,i)=>i?s.lineTo(p[0],-p[1]):s.moveTo(p[0],-p[1]));return s}
+function segDist(px,pz,ax,az,bx,bz){const dx=bx-ax,dz=bz-az,L=dx*dx+dz*dz||1;let t=((px-ax)*dx+(pz-az)*dz)/L;t=clamp(t,0,1);return Math.hypot(px-ax-t*dx,pz-az-t*dz)}
+
+/* ---------- renderer ---------- */
+const stage=$('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true,logarithmicDepthBuffer:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.5:2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.55;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);renderer.domElement.tabIndex=0;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(50,1,.5,30000);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.07;controls.maxPolarAngle=Math.PI*.49;controls.minDistance=6;controls.maxDistance=2600;
+const ANISO=renderer.capabilities.getMaxAnisotropy();
+
+/* ---------- procedural textures ---------- */
+function cv(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return [c,c.getContext('2d')]}
+function speckle(x,w,h,base,amt,n){x.fillStyle=base;x.fillRect(0,0,w,h);for(let i=0;i<n;i++){const v=(R()-.5)*amt;x.fillStyle=v>0?`rgba(255,255,255,${v})`:`rgba(0,0,0,${-v})`;x.fillRect(R()*w,R()*h,1+R()*2.5,1+R()*2.5)}}
+function tex(c,rx,ry,srgb=true){const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);t.anisotropy=ANISO;if(srgb)t.encoding=THREE.sRGBEncoding;return t}
+
+function facade(kind){
+  const [c,x]=cv(256,256),[e,y]=cv(256,256);
+  const wall={academic:'#ebe5da',dorm:'#efe0c6',school:'#f1e7d1',generic:'#e0d9cc',house:'#e9dcc7',ribbon:'#f3f2ee',louvre:'#7f878d',hall:'#efe4cf'}[kind];
+  speckle(x,256,256,wall,.10,3000);y.fillStyle='#000';y.fillRect(0,0,256,256);
+  const lit={academic:.45,dorm:.6,school:.15,generic:.35,house:.5,ribbon:.5,louvre:0,hall:.3}[kind];
+  if(kind==='louvre'){for(let i=0;i<256;i+=8){const g=x.createLinearGradient(i,0,i+6,0);g.addColorStop(0,'#f4f4f2');g.addColorStop(1,'#c9ccce');x.fillStyle=g;x.fillRect(i+1,0,5,256)}
+    for(let f=0;f<4;f++){x.fillStyle='rgba(40,44,48,.55)';x.fillRect(0,f*64+60,256,4)}
+    const m=tex(c,1/6,-1/14),em=tex(e,1/6,-1/14);m.offset.set(0,1/14);em.offset.set(0,1/14);return {m,em}}
+  for(let f=0;f<4;f++){const top=f*64;
+    x.fillStyle='rgba(0,0,0,.12)';x.fillRect(0,top+58,256,6);x.fillStyle='rgba(255,255,255,.4)';x.fillRect(0,top+57,256,1);
+    const w=[];
+    if(kind==='ribbon'){for(let i=0;i<8;i++)w.push([i*32,top+18,32,32]);x.fillStyle='rgba(0,0,0,.08)';x.fillRect(0,top+14,256,4)}
+    else if(kind==='hall'){for(let i=0;i<4;i++)w.push([i*64+20,top+8,24,48])}
+    else if(kind==='academic'){for(let i=0;i<8;i++)w.push([i*32+3,top+17,28,33]);x.fillStyle='rgba(0,0,0,.2)';x.fillRect(0,top+12,256,3);x.fillStyle='rgba(255,255,255,.5)';x.fillRect(0,top+11,256,1)}
+    else if(kind==='dorm'){for(let i=0;i<4;i++)w.push([i*64+12,top+13,40,37])}
+    else if(kind==='school'){for(let i=0;i<5;i++)w.push([i*51+8,top+18,34,30])}
+    else if(kind==='house'){for(let i=0;i<2;i++)w.push([i*128+40,top+20,40,30])}
+    else{for(let i=0;i<4;i++)w.push([i*64+17,top+18,30,32])}
+    w.forEach(([wx,wy,ww,wh])=>{
+      const g=x.createLinearGradient(0,wy,0,wy+wh);g.addColorStop(0,'#8ea3ae');g.addColorStop(.55,'#4a5f6b');g.addColorStop(1,'#25333c');
+      x.fillStyle=g;x.fillRect(wx,wy,ww,wh);
+      x.fillStyle='rgba(255,255,255,.16)';x.beginPath();x.moveTo(wx,wy+wh*.75);x.lineTo(wx+ww*.55,wy);x.lineTo(wx+ww*.8,wy);x.lineTo(wx,wy+wh);x.fill();
+      x.strokeStyle='rgba(70,70,70,.65)';x.lineWidth=1.5;x.strokeRect(wx+.5,wy+.5,ww-1,wh-1);
+      x.fillStyle='rgba(0,0,0,.25)';x.fillRect(wx,wy+wh,ww,2);
+      if(kind==='dorm'){x.fillStyle='rgba(60,60,60,.75)';x.fillRect(wx-5,wy+wh-9,ww+10,2);x.fillRect(wx-5,wy+wh-2,ww+10,2);for(let k=0;k<ww+10;k+=5)x.fillRect(wx-5+k,wy+wh-9,1,9)}
+      if(R()<lit){const cols=['#ffd49a','#ffefce','#ffe2ad','#dbe9ff','#fff6e6'];y.globalAlpha=.5+R()*.5;y.fillStyle=cols[R()*cols.length|0];y.fillRect(wx+2,wy+2,ww-4,wh-4);y.globalAlpha=1}
+    })}
+  const m=tex(c,1/12,-1/14),em=tex(e,1/12,-1/14);m.offset.set(0,1/14);em.offset.set(0,1/14);return {m,em};
+}
+function roofTex(base){const [c,x]=cv(256,256);speckle(x,256,256,base,.18,5000);
+  for(let i=0;i<14;i++){const g=x.createRadialGradient(R()*256,R()*256,0,R()*256,R()*256,30+R()*40);g.addColorStop(0,'rgba(0,0,0,.10)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,256,256)}
+  return tex(c,1/22,1/22)}
+function grassTex(){const [c,x]=cv(512,512);speckle(x,512,512,'#5f7d3c',.0,0);
+  for(let i=0;i<9000;i++){const h=80+R()*30,s=35+R()*25,l=22+R()*22;x.fillStyle=`hsla(${h},${s}%,${l}%,.55)`;x.fillRect(R()*512,R()*512,1+R()*2,2+R()*4)}
+  for(let i=0;i<22;i++){const cx=R()*512,cy=R()*512,g=x.createRadialGradient(cx,cy,0,cx,cy,40+R()*60);const d=R()<.5;
+    g.addColorStop(0,d?'rgba(120,100,60,.22)':'rgba(40,70,20,.22)');g.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=g;x.fillRect(0,0,512,512)}
+  return tex(c,1/36,1/36)}
+function asphaltTex(){const [c,x]=cv(256,256);speckle(x,256,256,'#45484b',.22,9000);
+  for(let i=0;i<10;i++){x.strokeStyle='rgba(20,20,20,.25)';x.lineWidth=1;x.beginPath();let px=R()*256,py=R()*256;x.moveTo(px,py);for(let k=0;k<6;k++){px+=(R()-.5)*40;py+=(R()-.5)*40;x.lineTo(px,py)}x.stroke()}
+  return tex(c,1,1)}
+function trackTex(){const [c,x]=cv(128,128);speckle(x,128,128,'#a8503a',.2,2500);return tex(c,1/8,1/8)}
+function waterNormal(){const N=256,[c,x]=cv(N,N),img=x.createImageData(N,N),H=new Float32Array(N*N);const waves=[];
+  for(let i=0;i<14;i++)waves.push([(R()*8|0)-4||1,(R()*8|0)-4||2,R()*6.28,.3+R()*.7]);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){let h=0;for(const w of waves)h+=w[3]*Math.sin(2*Math.PI*(w[0]*i+w[1]*j)/N+w[2]);H[j*N+i]=h}
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){const dx=H[j*N+(i+1)%N]-H[j*N+(i+N-1)%N],dy=H[((j+1)%N)*N+i]-H[((j+N-1)%N)*N+i];
+    let nx=-dx*.6,ny=-dy*.6,nz=1;const l=Math.hypot(nx,ny,nz);const k=(j*N+i)*4;img.data[k]=(nx/l*.5+.5)*255;img.data[k+1]=(ny/l*.5+.5)*255;img.data[k+2]=(nz/l*.5+.5)*255;img.data[k+3]=255}
+  x.putImageData(img,0,0);return tex(c,1/26,1/26,false)}
+function glowTex(){const [c,x]=cv(64,64),g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.25,'rgba(255,255,255,.55)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);const t=new THREE.CanvasTexture(c);return t}
+
+const GLOW=glowTex();
+const F={academic:facade('academic'),dorm:facade('dorm'),school:facade('school'),generic:facade('generic'),house:facade('house'),ribbon:facade('ribbon'),louvre:facade('louvre'),hall:facade('hall')};
+function tileTex(){const [c,x]=cv(128,128);speckle(x,128,128,'#d8d8d8',.16,1500);for(let i=0;i<128;i+=8){x.fillStyle='rgba(0,0,0,.22)';x.fillRect(0,i+6,128,2);x.fillStyle='rgba(255,255,255,.25)';x.fillRect(0,i,128,1)}return tex(c,1/5,1/5)}
+const TILE=tileTex();
+const T={roof:roofTex('#b9b5ad'),roofHouse:roofTex('#9b5a42'),grass:grassTex(),asph:asphaltTex(),track:trackTex(),water:waterNormal()};
+
+/* ---------- materials ---------- */
+const S=(o)=>new THREE.MeshStandardMaterial(o);
+const wallMats={};const wallList=[];
+function wall(kind,tint){const k=kind+tint;if(!wallMats[k]){wallMats[k]=S({map:F[kind].m,emissiveMap:F[kind].em,emissive:new THREE.Color('#ffffff'),emissiveIntensity:0,color:tint,roughness:.78,metalness:.02});wallList.push(wallMats[k])}return wallMats[k]}
+const mat={
+  roof:S({map:T.roof,color:'#d8d4cc',roughness:.95}),roofHouse:S({map:T.roofHouse,color:'#ffffff',roughness:.85}),
+  ground:S({map:T.grass,color:'#c9c4a5',roughness:1}),lawn:S({map:T.grass,color:'#ffffff',roughness:1}),park:S({map:T.grass,color:'#b9d3a2',roughness:1}),
+  road:S({map:T.asph,color:'#ffffff',roughness:.92,metalness:0}),walk:S({color:'#b9b4aa',roughness:.95}),mark:S({color:'#f2efe6',roughness:.7}),
+  track:S({map:T.track,color:'#ffffff',roughness:.9}),water:S({color:'#2c5966',roughness:.06,metalness:.25,normalMap:T.water,normalScale:new THREE.Vector2(.55,.55)}),
+  trunk:S({color:'#5b4635',roughness:.95}),leaf:S({color:'#ffffff',roughness:.82,flatShading:false}),
+  car:S({color:'#ffffff',roughness:.32,metalness:.55}),glass:S({color:'#1b2228',roughness:.08,metalness:.6}),
+  pole:S({color:'#6d7276',roughness:.6,metalness:.5}),skin:S({color:'#ffffff',roughness:.8}),
+  beacon:new THREE.MeshBasicMaterial({color:'#ffcf5a',transparent:true,opacity:.75,toneMapped:false,depthWrite:false})
+};
+[mat.ground,mat.lawn,mat.park].forEach(m=>m.map=T.grass);
+/* wind sway for tree canopies */
+const uTime={value:0};
+mat.leaf.onBeforeCompile=sh=>{sh.uniforms.uTime=uTime;sh.vertexShader='uniform float uTime;\n'+sh.vertexShader.replace('#include <begin_vertex>',
+  `#include <begin_vertex>
+  #ifdef USE_INSTANCING
+  float ph=instanceMatrix[3].x*.045+instanceMatrix[3].z*.061;
+  float k=max(position.y-2.0,0.0)*.035;
+  transformed.x+=sin(uTime*1.4+ph)*k; transformed.z+=cos(uTime*1.1+ph*1.3)*k*.7;
+  #endif`)};
+
+/* ---------- sky, sun, environment ---------- */
+const sky=new THREE.Sky();sky.scale.setScalar(12000);scene.add(sky);
+const SU=sky.material.uniforms;SU.turbidity.value=5;SU.rayleigh.value=1.4;SU.mieCoefficient.value=.004;SU.mieDirectionalG.value=.8;
+const envScene=new THREE.Scene();const envSky=new THREE.Mesh(sky.geometry,sky.material);envSky.scale.setScalar(12000);envScene.add(envSky);
+const pmrem=new THREE.PMREMGenerator(renderer);let envRT=null;
+function rebuildEnv(){const rt=pmrem.fromScene(envScene,0,1,30000);if(envRT)envRT.dispose();envRT=rt;scene.environment=rt.texture}
+
+const hemi=new THREE.HemisphereLight(0xcfe3f5,0x5d5a44,.3);scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xfff4e5,2);sun.castShadow=true;
+const SH=MOBILE?1024:2048;sun.shadow.mapSize.set(SH,SH);Object.assign(sun.shadow.camera,{left:-380,right:380,top:380,bottom:-380,near:10,far:2400});
+sun.shadow.bias=-0.0004;sun.shadow.normalBias=.6;scene.add(sun);scene.add(sun.target);
+scene.fog=new THREE.FogExp2(0xc4d4dc,.00045);
+
+/* stars */
+const starGeo=new THREE.BufferGeometry();{const p=[];for(let i=0;i<1800;i++){const u=R(),v=R()*.95+.05,th=u*Math.PI*2,ph=Math.acos(v);p.push(Math.sin(ph)*Math.cos(th)*9000,Math.cos(ph)*9000,Math.sin(ph)*Math.sin(th)*9000)}starGeo.setAttribute('position',new THREE.Float32BufferAttribute(p,3))}
+const stars=new THREE.Points(starGeo,new THREE.PointsMaterial({size:2.2,sizeAttenuation:false,color:'#ffffff',transparent:true,opacity:0,fog:false,toneMapped:false,depthWrite:false}));scene.add(stars);
+
+/* ---------- ground & land use ---------- */
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000),mat.ground);ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;
+T.grass.repeat.set(1/36,1/36);ground.geometry.attributes.uv.array.forEach((v,i,a)=>a[i]=v*9000);scene.add(ground);
+function flat(g,m,y){const mesh=new THREE.Mesh(new THREE.ShapeGeometry(shapeOf(g)),m);mesh.rotation.x=-Math.PI/2;mesh.position.y=y;mesh.receiveShadow=true;scene.add(mesh);return mesh}
+const campus=OSM.u;flat(campus,mat.lawn,.04);
+const blockers=[];
+OSM.l.forEach(([t,n,g])=>{
+  if(t==='track'){flat(g,mat.track,.1);const c=centroid(g);flat(g.map(p=>[c[0]+(p[0]-c[0])*.74,c[1]+(p[1]-c[1])*.74]),mat.park,.14)}
+  else flat(g,mat.park,t==='pitch'?.08:.06)});
+const waterMeshes=OSM.w.map(([n,g])=>{blockers.push({g,b:bbox(g)});return flat(g,mat.water,.12)});
+
+/* ---------- roads ---------- */
+const MAIN=n=>/อินใจมี$|ประชานิมิตร|เจษฎาบดินทร์$/.test(n)&&!/ซอย/.test(n);
+const roads=OSM.h.map(([t,n,g])=>{const main=MAIN(n);const w=main?11:t==='te'?9:t==='un'?7:t==='tr'?3.5:t==='re'?6:5;
+  const mid=centroid(g);return {t,n,g,w,main,inC:g.some(p=>inside(p,campus))}});
+function ribbonGeo(items){const pos=[],uv=[],idx=[];let base=0;
+  items.forEach(({pts,w,y,off=0})=>{let dist=0;
+    for(let i=0;i<pts.length;i++){const p=pts[i],a=pts[Math.max(0,i-1)],b=pts[Math.min(pts.length-1,i+1)];
+      let dx=b[0]-a[0],dz=b[1]-a[1];const L=Math.hypot(dx,dz)||1;dx/=L;dz/=L;const nx=-dz,nz=dx;
+      if(i)dist+=Math.hypot(p[0]-pts[i-1][0],p[1]-pts[i-1][1]);
+      const cx=p[0]+nx*off,cz=p[1]+nz*off;
+      pos.push(cx+nx*w/2,y,cz+nz*w/2,cx-nx*w/2,y,cz-nz*w/2);uv.push(0,dist/9,w/9,dist/9);
+      if(i){const k=base+i*2;idx.push(k-2,k,k-1,k-1,k,k+1)}}
+    base+=pts.length*2});
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  g.setIndex(idx);g.computeVertexNormals();return g}
+T.asph.repeat.set(1,1);
+const roadMesh=new THREE.Mesh(ribbonGeo(roads.map(r=>({pts:r.g,w:r.w,y:r.main?.3:.24}))),mat.road);roadMesh.receiveShadow=true;scene.add(roadMesh);
+const walkMesh=new THREE.Mesh(ribbonGeo(roads.filter(r=>r.main).flatMap(r=>[{pts:r.g,w:2.4,y:.42,off:r.w/2+1.2},{pts:r.g,w:2.4,y:.42,off:-r.w/2-1.2}])),mat.walk);walkMesh.receiveShadow=true;scene.add(walkMesh);
+/* dashed centre lines */
+{const items=[];roads.filter(r=>r.w>=6).forEach(r=>{const g=r.g;let carry=0;
+  for(let i=1;i<g.length;i++){const a=g[i-1],b=g[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]);const dx=(b[0]-a[0])/L,dz=(b[1]-a[1])/L;
+    for(let s=carry;s<L-3;s+=7){items.push({pts:[[a[0]+dx*s,a[1]+dz*s],[a[0]+dx*(s+3),a[1]+dz*(s+3)]],w:.18,y:(r.main?.3:.24)+.03})}carry=0}});
+  const m=new THREE.Mesh(ribbonGeo(items),mat.mark);scene.add(m)}
+
+/* ---------- buildings: per-building specs from Wikipedia facts + real photos ---------- */
+const pickables=[];const B=[];
+const roofMats={};function roofMat(col){if(!roofMats[col])roofMats[col]=S({map:TILE,color:col,roughness:.7,metalness:.15,side:THREE.DoubleSide});return roofMats[col]}
+const GREEN='#2f7a62',GREEN2='#3b8a6f',BROWN='#6a3a2a',RED='#9a4430',BLUE='#3c5d86',GREY='#8d949a',ORANGE='#b5653c';
+/* Facts: Wikipedia (floors, style) and photos (Wikimedia Commons, university posts on Google Images) */
+const NAMED={
+ 'อาคารภูมิราชภัฏ':{special:'bhumi',floors:9,src:'wiki',desc:'อาคาร 9 ชั้น สูงที่สุดในมหาวิทยาลัย สร้าง พ.ศ. 2540–2542 เป็นอาคารเรียนรวม และที่ตั้งสำนักงานอธิการบดี กองบริการการศึกษา งานรับนักศึกษา ด้านหน้าเป็นผนังโค้งบานเกล็ดสีเทา-ขาว มีป้ายชื่ออาคารสีทอง'},
+ 'นานาชาติ':{label:'อาคาร ICIT',floors:4,kind:'academic',tint:'#f6f4ee',roof:'flat',dome:true,src:'wiki',desc:'อาคาร 4 ชั้น มีโดมกลมบนหลังคา ที่ตั้งสถาบันอาเซียนศึกษา ศูนย์ภาษา ศูนย์คอมพิวเตอร์ ห้องเรียน วิทยาลัยนานาชาติ และห้องประชุม'},
+ 'คณะครุศาสตร์ อาคาร9':{label:'อาคาร ED (ครุศาสตร์ ใหม่)',floors:5,kind:'academic',tint:'#f8f6f0',roof:'hip',rc:BROWN,spire:true,src:'photo',desc:'อาคารคณะครุศาสตร์หลังใหม่ (ตึก ED) ผนังสีขาว หลังคาสีน้ำตาลเข้ม ด้านหน้าประดิษฐานพระพฤหัสบดี เทพแห่งวิชาชีพครู'},
+ 'อาคาร10':{floors:4,kind:'academic',tint:'#f5f2ea',roof:'hip',rc:GREEN,src:'photo',desc:'กลุ่มอาคารกลางวิทยาเขต อยู่ติดอาคารภูมิราชภัฏ'},
+ 'ตึกคณะมนุษย์':{label:'อาคาร 6 (ครุศาสตร์ เก่า)',floors:4,kind:'academic',tint:'#f5f2ea',roof:'hip',rc:GREEN,src:'est',desc:'อาคาร 6 อาคารเดิมของคณะครุศาสตร์ อยู่กลางวิทยาเขต ใกล้อาคารภูมิราชภัฏและอาคาร 10'},
+ 'ตึกมนุษยศาสตร์':{floors:4,kind:'academic',tint:'#f3eee2',roof:'hip',rc:GREEN,src:'photo',desc:'อาคารคณะมนุษยศาสตร์และสังคมศาสตร์ ด้านหน้ามีศาลพ่อปู่ทองดำและศาลแม่บังอร สิ่งศักดิ์สิทธิ์คู่มหาวิทยาลัย'},
+ 'ตึกวิทยการจัดการ':{label:'อาคารคณะวิทยาการจัดการ (FMS)',floors:4,kind:'academic',tint:'#efe8d8',roof:'curve',rc:GREEN2,src:'photo',desc:'อาคารทรงโค้งของคณะวิทยาการจัดการ หลังคาสีเขียว ด้านหน้าอาคารประดิษฐานพระพิฆเนศ'},
+ 'ตึก ท.อ':{label:'ตึก ท.อ. (เทคโนโลยีอุตสาหกรรม)',floors:3,kind:'school',tint:'#f2dc9e',roof:'hip',rc:GREEN,src:'photo',desc:'อาคารในกลุ่มคณะเทคโนโลยีอุตสาหกรรม'},
+ 'อาคารโรงงาน':{floors:2,kind:'generic',tint:'#e6e2d8',roof:'hip',rc:GREY,top:.7,rh:2.2,src:'est',desc:'อาคารโรงงานฝึกปฏิบัติของคณะเทคโนโลยีอุตสาหกรรม หลังคาโลหะ'},
+ 'อาคารเทคโนโลยี':{floors:5,kind:'academic',tint:'#f1d68e',roof:'flat',src:'photo',desc:'อาคารคณะเทคโนโลยีอุตสาหกรรม โทนสีเหลือง-ขาว ด้านหน้าประดิษฐานพระวิษณุกรรม เทพแห่งวิศวกรรม'},
+ 'โรงอาหาร':{label:'ศูนย์อาหาร (โรงอาหาร)',floors:2,kind:'hall',tint:'#f2ead8',roof:'hip',rc:'#2f7d84',top:.45,rh:4,src:'photo',desc:'ศูนย์อาหารของมหาวิทยาลัย อยู่ติดหอประชุมและลานจอดรถ'},
+ 'ห้องประชุม':{label:'หอประชุมมหาวิทยาลัย',floors:1,fh:9,kind:'hall',tint:'#f0e2c4',roof:'hip',rc:RED,top:.18,rh:8,src:'wiki',desc:'อาคารอเนกประสงค์ทรงไทยประยุกต์ 1 ชั้น มีประตูเข้า-ออก 3 ประตู ใช้จัดปฐมนิเทศนักศึกษาใหม่ กิจกรรมเฟรชชี่ไนท์ และการประชุมสัมมนา'},
+ 'โรงจอดรถหลังโรงอาหาร':{floors:1,fh:4.5,kind:'generic',tint:'#d9d9d4',roof:'hip',rc:GREY,top:.85,rh:1,src:'est',desc:'โรงจอดรถหลังศูนย์อาหาร'},
+ 'อาคารก่อสร้าง':{floors:3,kind:'generic',tint:'#b9b8b2',roof:'flat',src:'est',desc:'ระบุในแผนที่ว่าเป็นอาคารที่กำลังก่อสร้าง'},
+ 'หอพักเฉลิมพระเกียรติ 14 (อินทนิล)':{floors:5,kind:'dorm',tint:'#f4ead6',roof:'hip',rc:GREEN,src:'est',desc:'หอพักนักศึกษาในมหาวิทยาลัย'},
+ 'หอ 15(บ้านกาสลอง)':{floors:5,kind:'dorm',tint:'#f4ead6',roof:'hip',rc:GREEN,src:'est',desc:'หอพักนักศึกษาในมหาวิทยาลัย'},
+};
+/* ED: the two mapped footprints at the north end are one building (confirmed by the user) */
+const ED_C=[30,-289],B9_C=[16.5,-204],B8_C=[9,-164];
+/* per Google Maps satellite image: brown-roof L = ED, the dark-roof rectangle north of it = gymnasium */
+const ED_PARTS=[];
+/* places pinned by the user on Google Maps (lat,lng → local metres) */
+const LL=(la,lo)=>[Math.round((lo-LON0)*KX),Math.round(-(la-LAT0)*KY)];
+const PIN={uni:LL(17.6334887,100.0935269),gym:LL(17.6351601,100.0926237),pool:LL(17.6297559,100.0939632),school:LL(17.6349217,100.0950157),sci:LL(17.631348,100.0935481),arit:LL(17.6318843,100.094592),dome:LL(17.630267,100.093285)};
+const BYPOS=[
+ {c:[294,-246],sp:{label:'โรงเรียนสาธิตมหาวิทยาลัยราชภัฏอุตรดิตถ์',floors:3,kind:'school',tint:'#f6efe0',roof:'hip',rc:RED,src:'est',desc:'อาคารที่อยู่ใกล้หมุดของโรงเรียนสาธิตใน Google Maps ริมถนนอินใจมี ใช้ตำแหน่งจากหมุดที่ส่งมา ส่วนสีและจำนวนชั้นเป็นค่าประมาณ'}},
+ {c:[121,144],sp:{label:'อุทยานวิทยาศาสตร์ภาคเหนือ',floors:3,kind:'academic',tint:'#f3f0e8',roof:'hip',rc:GREEN,src:'est',desc:'เดิมชื่อศูนย์วิทยาศาสตร์และเทคโนโลยี เป็นที่รวบรวมงานวิจัย อุปกรณ์ เครื่องมือ และผลงานด้านวิทยาศาสตร์และเทคโนโลยี'}},
+ {c:[260,79],sp:{label:'สำนักวิทยบริการและเทคโนโลยีสารสนเทศ (ARIT)',floors:6,kind:'academic',tint:'#f3dc98',roof:'flat',src:'wiki',desc:'หอสมุดกลางของมหาวิทยาลัย อาคารบรรณราชนครินทร์สูง 6 ชั้น สร้างเสร็จปี 2541 มีทางเดินเชื่อมกับอาคารหลังเดิม โทนสีเหลืองครีมตามภาพที่สำนักฯ เผยแพร่'}},
+];
+function specFor(name,type,a,inC,c,i){
+  if(NAMED[name])return NAMED[name];
+  if(Math.hypot(c[0]-ED_C[0],c[1]-ED_C[1])<6)return {label:'โรงยิมเนเซี่ยม',floors:1,fh:11,kind:'hall',tint:'#e8e5de',roof:'hip',rc:'#4b5157',top:.72,rh:2.6,src:'photo',desc:'โรงยิมเนเซี่ยมของมหาวิทยาลัย อยู่ทางทิศเหนือของอาคาร ED ตำแหน่งตามหมุด Google Maps หลังคาสีเข้มตามภาพดาวเทียม ความสูงเป็นค่าประมาณ'};
+  if(Math.hypot(c[0]-25,c[1]+344)<12)return {floors:4,kind:'academic',tint:'#f3f1eb',roof:'hip',rc:'#7fa8c8',src:'photo'};
+  for(const o of BYPOS)if(Math.hypot(c[0]-o.c[0],c[1]-o.c[1])<6)return o.sp;
+  if(Math.hypot(c[0]-B9_C[0],c[1]-B9_C[1])<6)return {label:'อาคาร 9',floors:4,kind:'academic',tint:'#f6f2ea',roof:'hip',rc:'#7fa8c8',src:'est',desc:'อาคาร 9 หลังคาสีฟ้า อยู่ถัดจากอาคาร ED ไปทางทิศใต้'};
+  if(Math.hypot(c[0]-B8_C[0],c[1]-B8_C[1])<6)return {label:'อาคาร 8',floors:4,kind:'academic',tint:'#f6f2ea',roof:'hip',rc:'#7fa8c8',src:'est',desc:'อาคาร 8 หลังคาสีฟ้า อยู่ถัดจากอาคาร 9 ไปทางทิศใต้'};
+  const hsh=(Math.abs(Math.round(c[0]*7+c[1]*13))%100)/100;
+  if(type==='house')return {floors:2,fh:3.2,kind:'house',tint:'#ffffff',roof:'hip',rc:[RED,ORANGE,GREY,BLUE][Math.floor(hsh*4)],top:.3,rh:2.4};
+  if(type==='carport')return {floors:1,fh:4,kind:'generic',tint:'#cfcfcf',roof:'hip',rc:GREY,top:.85,rh:.8};
+  if(type==='dormitory')return {floors:inC?5:4,kind:'dorm',tint:'#f4ead6',roof:inC?'hip':'flat',rc:GREEN};
+  if(type==='school')return {floors:3,kind:'school',tint:'#ffffff',roof:'hip',rc:hsh<.5?RED:BLUE,top:.35,rh:3};
+  if(inC){const fl=a>1200?4:a>500?3:2;return {floors:fl,kind:'academic',tint:hsh<.8?'#f6f2ea':'#f1dfb0',roof:a>220?'hip':'flat',rc:hsh<.72?GREEN:hsh<.86?BLUE:RED}}
+  if(a<260)return {floors:2,fh:3.3,kind:'house',tint:['#efe7da','#e6ecef','#f1e3d3','#e9e9e4'][Math.floor(hsh*4)],roof:'hip',rc:[RED,ORANGE,GREY,BLUE,GREEN][Math.floor(hsh*5)],top:.3,rh:2.2};
+  return {floors:a>1500?3:2,kind:'generic',tint:['#efe7da','#e6ecef','#f1e3d3','#e9e9e4'][Math.floor(hsh*4)],roof:hsh<.5?'flat':'hip',rc:[GREY,BLUE,RED][Math.floor(hsh*3)],top:.5,rh:2.5}}
+
+/* hip roof as a frustum between the eave ring (with overhang) and a shrunken ridge ring */
+function hipRoof(g,y0,rh,over,top,col){const c=centroid(g);const A=g.map(p=>{const dx=p[0]-c[0],dz=p[1]-c[1],d=Math.hypot(dx,dz)||1,s=(d+over)/d;return [c[0]+dx*s,c[1]+dz*s]});
+  const Bv=g.map(p=>[c[0]+(p[0]-c[0])*top,c[1]+(p[1]-c[1])*top]);const pos=[],uv=[];const y1=y0+rh;
+  for(let i=0;i<g.length;i++){const j=(i+1)%g.length;const a0=A[i],a1=A[j],b0=Bv[i],b1=Bv[j];const L=Math.hypot(a1[0]-a0[0],a1[1]-a0[1]);const sl=Math.hypot(rh,Math.hypot((b0[0]+b1[0]-a0[0]-a1[0])/2,(b0[1]+b1[1]-a0[1]-a1[1])/2));
+    pos.push(a0[0],y0,a0[1],a1[0],y0,a1[1],b1[0],y1,b1[1], a0[0],y0,a0[1],b1[0],y1,b1[1],b0[0],y1,b0[1]);uv.push(0,0,L,0,L,sl, 0,0,L,sl,0,sl)}
+  const tri=(ring,y)=>{const pts=ring.map(p=>new THREE.Vector2(p[0],p[1]));let f;try{f=THREE.ShapeUtils.triangulateShape(pts,[])}catch(e){f=[]}f.forEach(t=>t.forEach(k=>{pos.push(ring[k][0],y,ring[k][1]);uv.push(ring[k][0],ring[k][1])}))};
+  tri(Bv,y1);tri(A,y0);
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.computeVertexNormals();
+  const m=new THREE.Mesh(geo,roofMat(col));m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+function box(w,h,d,matl,x,y,z,ry=0){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),matl);m.position.set(x,y,z);m.rotation.y=ry;m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+const domeMat=S({color:'#5f8fc4',roughness:.12,metalness:.45,transparent:true,opacity:.92});
+const goldMat=S({color:'#d6a93a',roughness:.35,metalness:.8});
+function textTex(txt,w,h,fg,bg,font){const [c,x]=cv(w,h);x.fillStyle=bg;x.fillRect(0,0,w,h);x.fillStyle=fg;x.font=font;x.textAlign='center';x.textBaseline='middle';x.fillText(txt,w/2,h/2+h*.04);const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=ANISO;return t}
+const signs=[];
+function extrude(g,h,mats,y=0){const geo=new THREE.ExtrudeGeometry(shapeOf(g),{depth:h,bevelEnabled:false});const m=new THREE.Mesh(geo,mats);m.rotation.x=-Math.PI/2;m.position.y=y;m.castShadow=true;m.receiveShadow=true;scene.add(m);return m}
+OSM.b.forEach(([name,lv,type,g],idx)=>{
+  const c=centroid(g),a=area(g),inC=inside(c,campus);const sp=specFor(name,type,a,inC,c,idx);
+  const fh=sp.fh||3.5,h=lv?lv*3.5:sp.floors*fh;let m;
+  if(sp.special==='bhumi'){
+    m=extrude(g,10.5,[mat.roof,wall('louvre','#ffffff')]);
+    const tower=[[60,-54],[133,-46],[131,-27],[56,-31]];const tw=extrude(tower,31.5,[mat.roof,wall('ribbon','#ffffff')]);tw.userData.info=null;
+    box(16,4,10,wall('ribbon','#ffffff'),95,33.5,-40,-.11);box(70,1,1,mat.roof,95,31.9,-46.5,-.11);
+    pickables.push(tw);sp.tower=tw;
+    const st=textTex('ภูมิราชภัฏ',1024,256,'#e2b64a','#585e63','bold 150px Anuphan, "Noto Sans Thai", sans-serif');
+    const sg=new THREE.Mesh(new THREE.PlaneGeometry(22,5.5),new THREE.MeshStandardMaterial({map:st,roughness:.5,metalness:.3}));sg.position.set(100,6.2,-2.6);sg.rotation.y=-.08;scene.add(sg);signs.push([st,'ภูมิราชภัฏ',1024,256,'#e2b64a','#585e63','bold 150px Anuphan, "Noto Sans Thai", sans-serif']);
+  }else{
+    const roofCap=sp.roof==='flat'?mat.roof:roofMat(sp.rc);
+    m=extrude(g,h,[sp.roof==='flat'?mat.roof:mat.roof,wall(sp.kind,sp.tint)]);
+    if(sp.roofParts&&ED_PARTS.length){ED_PARTS.forEach(pg=>hipRoof(pg,h,pg.length<5?2.2:Math.min(5.5,Math.sqrt(area(pg))*.16+1.2),pg.length<5?.6:1.4,pg.length<5?.6:.42,sp.rc))}
+    else if(sp.roof==='hip')hipRoof(g,h,sp.rh||Math.min(5.5,Math.sqrt(a)*.16+1.2),sp.kind==='house'?.6:1.4,sp.top!=null?sp.top:.42,sp.rc);
+    else if(sp.roof==='curve')hipRoof(g,h,1.6,1.2,.93,sp.rc);
+    else if(a>300){const pg=g.map(p=>[c[0]+(p[0]-c[0])*1.0,c[1]+(p[1]-c[1])*1.0]);hipRoof(pg,h,1.1,0,.985,'#bfbab0')}
+    if(sp.dome){const d=new THREE.Mesh(new THREE.SphereGeometry(6.5,28,14,0,Math.PI*2,0,Math.PI/2),domeMat);d.position.set(c[0],h+1.2,c[1]);d.castShadow=true;scene.add(d);
+      const ring=new THREE.Mesh(new THREE.CylinderGeometry(7.2,7.2,1.3,28),wall('ribbon','#ffffff'));ring.position.set(c[0],h+.6,c[1]);scene.add(ring)}
+    if(sp.spire){const sy=h+(sp.rh||5);const sc=new THREE.Mesh(new THREE.ConeGeometry(2.6,9,4),goldMat);sc.position.set(c[0],sy+3.5,c[1]);sc.rotation.y=Math.PI/4;sc.castShadow=true;scene.add(sc)}
+    if(a>500&&sp.roof==='flat'&&!sp.dome){const n=Math.min(4,Math.floor(a/700));for(let i=0;i<n;i++){const pt=g[(i*3)%g.length];box(2.2,1.4,1.6,mat.pole,lerp(c[0],pt[0],.45),h+1.9,lerp(c[1],pt[1],.45))}}
+  }
+  const info={edPart:!!sp.edPart,name:sp.label||name,osm:name,type,a,h:sp.special==='bhumi'?31.5:h,c,inC,g,b:bbox(g),mesh:m,kind:sp.kind,floors:sp.special==='bhumi'?9:(lv||sp.floors),src:sp.src||'est',desc:sp.desc||''};
+  B.push(info);pickables.push(m);m.userData.info=info;if(sp.tower)sp.tower.userData.info=info;blockers.push({g,b:info.b});
+});
+{const parts=B.filter(b=>b.edPart);if(parts.length>1){const main=parts.find(b=>b.osm==='คณะครุศาสตร์ อาคาร9')||parts[0];main.extra=[];
+  parts.forEach(p=>{if(p===main)return;main.extra.push(p.mesh);p.mesh.userData.info=main;p.alias=true});main.a=parts.reduce((t,p)=>t+p.a,0);
+  const all=parts.flatMap(p=>p.g);main.c=centroid(all)}}
+/* re-render canvas signs once the Thai web font has loaded */
+if(document.fonts&&document.fonts.load)document.fonts.load('bold 40px Anuphan').then(()=>signs.forEach(([t,txt,w,h,fg,bg,font])=>{const x=t.image.getContext('2d');x.fillStyle=bg;x.fillRect(0,0,w,h);x.fillStyle=fg;x.font=font;x.textAlign='center';x.textBaseline='middle';x.fillText(txt,w/2,h/2+h*.04);t.needsUpdate=true})).catch(()=>{});
+
+/* ---------- landmarks ---------- */
+const cream=S({color:'#efe3c4',roughness:.8}),bronze=S({color:'#4a3b2c',roughness:.45,metalness:.7}),stone=S({color:'#d9d6cf',roughness:.9});
+/* entrance name sign beside the campus entrance road off Inchaimee Rd (styled after the sign in campus photos; position estimated) */
+const SIGN=[236,-305];{const gg=new THREE.Group();gg.position.set(SIGN[0],0,SIGN[1]);gg.rotation.y=Math.PI-Math.atan2(-16,42);scene.add(gg);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;gg.add(o);return o};
+  const granite=S({color:'#1f262c',roughness:.35,metalness:.3});
+  add(new THREE.BoxGeometry(17,.5,4.2),stone,0,.25,0);
+  add(new THREE.BoxGeometry(16,1.1,1.4),cream,0,1.05,0);
+  [-7.4,7.4].forEach(x=>{add(new THREE.BoxGeometry(1.4,4.6,1.5),cream,x,2.8,0);add(new THREE.BoxGeometry(1.7,.35,1.8),goldMat,x,5.25,0)});
+  add(new THREE.BoxGeometry(13.4,2.9,.9),granite,0,3.05,0);
+  const tri=new THREE.Shape();tri.moveTo(-3.6,0);tri.lineTo(3.6,0);tri.lineTo(0,3.2);tri.lineTo(-3.6,0);
+  const gab=new THREE.Mesh(new THREE.ExtrudeGeometry(tri,{depth:1.2,bevelEnabled:false}),cream);gab.position.set(0,4.5,-.6);gab.castShadow=true;gg.add(gab);
+  const gab2=new THREE.Mesh(new THREE.ExtrudeGeometry(tri,{depth:.15,bevelEnabled:false}),goldMat);gab2.scale.set(1.12,1.1,1);gab2.position.set(0,4.42,-.7);gg.add(gab2);
+  add(new THREE.BoxGeometry(14.8,.3,1.3),goldMat,0,4.55,0);
+  const em=new THREE.Mesh(new THREE.CylinderGeometry(.95,.95,.2,32),goldMat);em.rotation.x=Math.PI/2;em.position.set(0,5.75,.66);gg.add(em);
+  const em2=new THREE.Mesh(new THREE.CylinderGeometry(.7,.7,.22,32),S({color:'#2f7a62',roughness:.5}));em2.rotation.x=Math.PI/2;em2.position.set(0,5.75,.7);gg.add(em2);
+  const mkSign=()=>{const [c,x]=cv(1024,224);x.fillStyle='#1f262c';x.fillRect(0,0,1024,224);x.fillStyle='#e6bf5c';x.textAlign='center';x.textBaseline='middle';
+    x.font='bold 76px Anuphan, "Noto Sans Thai", sans-serif';x.fillText('มหาวิทยาลัยราชภัฏอุตรดิตถ์',512,88,980);x.font='600 46px "Chakra Petch", Anuphan, sans-serif';x.fillText('UTTARADIT RAJABHAT UNIVERSITY',512,170);return c};
+  const sc=mkSign();const st=new THREE.CanvasTexture(sc);st.encoding=THREE.sRGBEncoding;st.anisotropy=ANISO;
+  [1,-1].forEach(d=>{const pl=new THREE.Mesh(new THREE.PlaneGeometry(12.4,2.7),new THREE.MeshStandardMaterial({map:st,roughness:.4,metalness:.2,emissive:'#ffffff',emissiveMap:st,emissiveIntensity:0}));pl.position.set(0,3.05,d*.46);if(d<0)pl.rotation.y=Math.PI;gg.add(pl);wallList.push(pl.material)});
+  if(document.fonts&&document.fonts.load)Promise.all([document.fonts.load('bold 40px Anuphan'),document.fonts.load('600 40px "Chakra Petch"')]).then(()=>{const c=mkSign();sc.getContext('2d').drawImage(c,0,0);st.needsUpdate=true}).catch(()=>{});
+  /* flower bed in front */
+  const bed=add(new THREE.BoxGeometry(15,.45,2),S({color:'#4a3a2c',roughness:1}),0,.72,1.9);
+  const fl=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.32,0),S({color:'#ffffff',roughness:.8}),120);const M=new THREE.Matrix4(),col=new THREE.Color();
+  for(let i=0;i<120;i++){M.makeTranslation(-7+R()*14,1.05+R()*.2,1.1+R()*1.6);fl.setMatrixAt(i,M);fl.setColorAt(i,col.set(['#d8352a','#f08a24','#f4c430','#c2185b','#2e7d32','#2e7d32'][(R()*6)|0]))}gg.add(fl);
+  const cx=Math.cos(gg.rotation.y),sx=Math.sin(gg.rotation.y);const corner=(lx,lz)=>[SIGN[0]+lx*cx+lz*sx,SIGN[1]-lx*sx+lz*cx];const poly=[corner(-8.5,-2.1),corner(8.5,-2.1),corner(8.5,3),corner(-8.5,3)];
+  blockers.push({g:poly,b:bbox(poly)})}
+/* swimming pool (สระว่ายน้ำเฉลิมราชภัฏ): the mapped pool outline gets a deck, clear water and lane lines */
+{const pg=OSM.w.find(w=>inside(PIN.pool,w[1]));if(pg){const g=pg[1].slice(0,-1);const c=centroid(g);
+  const deck=g.map(p=>{const dx=p[0]-c[0],dz=p[1]-c[1],d=Math.hypot(dx,dz);return [c[0]+dx*(d+4)/d,c[1]+dz*(d+4)/d]});
+  flat(deck,S({color:'#d9d4c8',roughness:.9}),.2);
+  const pm=S({color:'#3ab5c8',roughness:.04,metalness:.1,normalMap:T.water,normalScale:new THREE.Vector2(.25,.25),transparent:true,opacity:.92});flat(g,pm,.32);
+  const a=[(g[0][0]+g[1][0])/2,(g[0][1]+g[1][1])/2],b=[(g[2][0]+g[3][0])/2,(g[2][1]+g[3][1])/2];const w0=[g[0],g[3]],w1=[g[1],g[2]];
+  const lines=[];for(let k=1;k<8;k++){const t=k/8;const p0=[lerp(g[0][0],g[1][0],t),lerp(g[0][1],g[1][1],t)],p1=[lerp(g[3][0],g[2][0],t),lerp(g[3][1],g[2][1],t)];lines.push({pts:[p0,p1],w:.35,y:.34})}
+  const lm=new THREE.Mesh(ribbonGeo(lines),new THREE.MeshBasicMaterial({color:'#1d4f8a',transparent:true,opacity:.7}));scene.add(lm)}}
+/* sports dome (pinned by the user; not in the map data, so footprint and size are estimates) */
+{const D=PIN.dome;const ry=Math.atan2(-21,123);const gg=new THREE.Group();gg.position.set(D[0],0,D[1]);gg.rotation.y=ry;scene.add(gg);
+  const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;gg.add(o);return o};
+  add(new THREE.BoxGeometry(46,.3,66),S({color:'#bdb8ad',roughness:.9}),0,.15,0);
+  add(new THREE.BoxGeometry(30,.05,48),S({color:'#2f7f5a',roughness:.8}),0,.33,0);add(new THREE.BoxGeometry(26,.06,44),S({color:'#c0603e',roughness:.8}),0,.36,0);
+  for(let z=-32;z<=32;z+=8)[-21.5,21.5].forEach(x=>add(new THREE.BoxGeometry(.7,7,.7),S({color:'#e8e4da',roughness:.7}),x,3.5,z));
+  [-21.5,21.5].forEach(x=>add(new THREE.BoxGeometry(.6,1.1,66),S({color:'#e8e4da',roughness:.7}),x,.85,0));
+  const arch=new THREE.CylinderGeometry(22.6,22.6,68,40,1,true,-Math.PI/2,Math.PI);arch.rotateX(-Math.PI/2);arch.scale(1,.5,1);
+  const roof=new THREE.Mesh(arch,S({color:'#6d8aa3',roughness:.45,metalness:.55,side:THREE.DoubleSide,map:TILE}));roof.position.set(0,7,0);roof.castShadow=true;roof.receiveShadow=true;gg.add(roof);
+  [-34,34].forEach(z=>{const e=new THREE.Mesh(new THREE.CircleGeometry(22.6,40,0,Math.PI),S({color:'#cfd8de',roughness:.2,metalness:.2,transparent:true,opacity:.35,side:THREE.DoubleSide}));e.scale.y=.5;e.position.set(0,7,z);gg.add(e)});
+  const cx=Math.cos(ry),sx=Math.sin(ry);const cr=(lx,lz)=>[D[0]+lx*cx+lz*sx,D[1]-lx*sx+lz*cx];const poly=[cr(-23,-34),cr(23,-34),cr(23,34),cr(-23,34)];
+  const info={name:'โดมกีฬาสนามหลัง',osm:'',type:'dome',a:46*66,h:18,c:D,inC:true,g:poly,b:bbox(poly),mesh:roof,kind:'dome',floors:1,src:'est',desc:'โดมกีฬาหลังคาโค้งทางด้านหลังมหาวิทยาลัย ตำแหน่งตามหมุดที่ส่งมา ขนาดและทิศทางของอาคารเป็นค่าประมาณ เพราะยังไม่มีรูปทรงในแผนที่'};
+  roof.material=[roof.material,roof.material];roof.geometry.clearGroups();roof.geometry.addGroup(0,Infinity,1);
+  B.push(info);pickables.push(roof);roof.userData.info=info;blockers.push({g:poly,b:info.b})}
+/* Sala Saengsiri — Thai pavilion inside the main sports field (exact spot not mapped; placed at the field's west edge) */
+const SALA=[86,-228];{const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(x,y,z);o.castShadow=true;scene.add(o);return o};
+  add(new THREE.BoxGeometry(9,.6,9),stone,SALA[0],.3,SALA[1]);[[-3.6,-3.6],[3.6,-3.6],[-3.6,3.6],[3.6,3.6]].forEach(([x,z])=>add(new THREE.CylinderGeometry(.22,.22,3.6,8),cream,SALA[0]+x,2.4,SALA[1]+z));
+  const r=add(new THREE.ConeGeometry(7.2,4.4,4),roofMat(RED),SALA[0],6.3,SALA[1]);r.rotation.y=Math.PI/4;const r2=add(new THREE.ConeGeometry(4.4,3.4,4),roofMat(RED),SALA[0],8.6,SALA[1]);r2.rotation.y=Math.PI/4;
+  add(new THREE.ConeGeometry(.35,2.4,8),goldMat,SALA[0],11.2,SALA[1])}
+/* Phraya Phichai Dap Hak monument (OSM: อนุสาวรีย์พระยาพิชัยดาบหัก) across Prachanimit Rd */
+const MON=(()=>{const g=OSM.l.find(l=>/อนุสาวรีย์/.test(l[1]))[2];const c=centroid(g);return [c[0]+4,c[1]]})();
+{const add=(geo,m,x,y,z)=>{const o=new THREE.Mesh(geo,m);o.position.set(MON[0]+x,y,MON[1]+z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o};
+  add(new THREE.CylinderGeometry(16,17,.8,40),stone,0,.4,0);add(new THREE.CylinderGeometry(11,12,.8,40),stone,0,1.2,0);add(new THREE.BoxGeometry(5.5,5,5.5),stone,0,4.1,0);add(new THREE.BoxGeometry(6.2,.5,6.2),goldMat,0,6.8,0);
+  add(new THREE.CylinderGeometry(.55,.75,2.4,10),bronze,0,8.3,0);add(new THREE.CylinderGeometry(.75,.55,1.4,10),bronze,0,10.1,0);add(new THREE.SphereGeometry(.42,14,10),bronze,0,11.2,0);
+  [-1,1].forEach(s=>{const arm=add(new THREE.CylinderGeometry(.16,.13,1.5,8),bronze,s*.9,10,0);arm.rotation.z=s*.9;const sw=add(new THREE.BoxGeometry(.08,2.4,.16),S({color:'#bfc3c7',metalness:.9,roughness:.25}),s*1.7,11,0);sw.rotation.z=s*-.5});
+  blockers.push({g:[[MON[0]-12,MON[1]-12],[MON[0]+12,MON[1]-12],[MON[0]+12,MON[1]+12],[MON[0]-12,MON[1]+12]],b:[MON[0]-12,MON[1]-12,MON[0]+12,MON[1]+12]})}
+/* grandstand of the provincial stadium (OSM: สนามกีฬาพระยาพิชัยดาบหัก) */
+{const g=OSM.l.find(l=>/สนามกีฬาพระยาพิชัย/.test(l[1]))[2];const c=centroid(g);
+  for(let i=0;i<8;i++)box(70,1,2.2,stone,c[0]-60+i*1.9,.5+i*.9,c[1],Math.PI/2);box(1,14,74,stone,c[0]-44,7,c[1]);
+  const can=box(18,.5,76,roofMat('#d9dde0'),c[0]-52,15,c[1]);can.rotation.z=-.12}
+/* distant mountains to the north and east of Uttaradit (terrain context; shapes are illustrative) */
+const mountainMat1=new THREE.MeshBasicMaterial({color:'#7d8c96',fog:false}),mountainMat2=new THREE.MeshBasicMaterial({color:'#9aa7b0',fog:false});
+function ridge(R,hmin,hmax,a0,a1,matl,seedOff){const pos=[];const N=180;for(let i=0;i<N;i++){const t0=i/N,t1=(i+1)/N;const az0=lerp(a0,a1,t0),az1=lerp(a0,a1,t1);
+    const hf=t=>{const a=lerp(a0,a1,t)*7+seedOff;const n=(Math.sin(a*3.1)+Math.sin(a*7.3+1)*.5+Math.sin(a*13.7+2)*.25+1.75)/3.5;const edge=smooth(0,.12,t)*smooth(1,.88,t);return hmin+(hmax-hmin)*n*edge};
+    const P=(az,r,y)=>[Math.sin(az)*r,y,-Math.cos(az)*r];const b0=P(az0,R,-40),b1=P(az1,R,-40),u0=P(az0,R*.985,hf(t0)),u1=P(az1,R*.985,hf(t1));
+    pos.push(...b0,...u0,...u1,...b0,...u1,...b1)}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));const m=new THREE.Mesh(geo,matl);m.material.side=THREE.DoubleSide;m.renderOrder=-1;scene.add(m);return m}
+const D2R=Math.PI/180;ridge(15000,500,1400,-75*D2R,150*D2R,mountainMat2,2.2);ridge(9500,180,650,-50*D2R,120*D2R,mountainMat1,.7);
+
+/* spatial grid for blockers (collision, tree placement) */
+const CELL=40,grid=new Map();const key=(i,j)=>i*100000+j;
+blockers.forEach(o=>{for(let i=Math.floor(o.b[0]/CELL);i<=Math.floor(o.b[2]/CELL);i++)for(let j=Math.floor(o.b[1]/CELL);j<=Math.floor(o.b[3]/CELL);j++){const k=key(i,j);if(!grid.has(k))grid.set(k,[]);grid.get(k).push(o)}});
+function blocked(x,z,m=0){const l=grid.get(key(Math.floor(x/CELL),Math.floor(z/CELL)));if(!l)return false;
+  for(const o of l){if(x<o.b[0]-m||x>o.b[2]+m||z<o.b[1]-m||z>o.b[3]+m)continue;if(inside([x,z],o.g))return true;
+    if(m>0)for(let i=0;i<o.g.length;i++){const a=o.g[i],b=o.g[(i+1)%o.g.length];if(segDist(x,z,a[0],a[1],b[0],b[1])<m)return true}}return false}
+const rgrid=new Map();roads.forEach(r=>{for(let i=1;i<r.g.length;i++){const a=r.g[i-1],b=r.g[i];const s=[a[0],a[1],b[0],b[1],r.w/2+(r.main?2.6:1.5)];
+  const x0=Math.floor(Math.min(a[0],b[0])/CELL)-1,x1=Math.floor(Math.max(a[0],b[0])/CELL)+1,z0=Math.floor(Math.min(a[1],b[1])/CELL)-1,z1=Math.floor(Math.max(a[1],b[1])/CELL)+1;
+  for(let ii=x0;ii<=x1;ii++)for(let jj=z0;jj<=z1;jj++){const k=key(ii,jj);if(!rgrid.has(k))rgrid.set(k,[]);rgrid.get(k).push(s)}}});
+function nearRoad(x,z,extra){const l=rgrid.get(key(Math.floor(x/CELL),Math.floor(z/CELL)));if(!l)return false;for(const s of l)if(segDist(x,z,s[0],s[1],s[2],s[3])<s[4]+extra)return true;return false}
+const noTree=OSM.l.filter(l=>l[0]!=='park').map(l=>l[2]);
+
+/* ---------- trees (instanced) ---------- */
+{const pts=[];const dens=MOBILE?.55:1;
+  for(let x=-520;x<720;x+=6.5)for(let z=-720;z<860;z+=6.5){const px=x+(R()-.5)*5,pz=z+(R()-.5)*5;const inC=inside([px,pz],campus);
+    const inPark=OSM.l.some(l=>l[0]==='park'&&inside([px,pz],l[2]));
+    const p=(inC?.30:inPark?.45:.10)*dens;if(R()>p)continue;
+    if(noTree.some(g=>inside([px,pz],g)))continue;if(nearRoad(px,pz,1.2))continue;if(blocked(px,pz,2.5))continue;pts.push([px,pz,inC])}
+  const N=pts.length;
+  const trunkG=new THREE.CylinderGeometry(.16,.3,1,7);trunkG.translate(0,.5,0);
+  const leafG=new THREE.IcosahedronGeometry(1,2);{const p=leafG.attributes.position;for(let i=0;i<p.count;i++){const v=new THREE.Vector3().fromBufferAttribute(p,i);v.multiplyScalar(1+(Math.sin(v.x*5.1)*Math.cos(v.z*4.3)+Math.sin(v.y*6.7))*.09);p.setXYZ(i,v.x,v.y,v.z)}leafG.computeVertexNormals()}
+  const trunks=new THREE.InstancedMesh(trunkG,mat.trunk,N),leaves=new THREE.InstancedMesh(leafG,mat.leaf,N*2);
+  const M4=new THREE.Matrix4(),Q=new THREE.Quaternion(),V=new THREE.Vector3(),Sc=new THREE.Vector3(),col=new THREE.Color();
+  let li=0;
+  pts.forEach(([x,z,inC],i)=>{const t=R();const flame=inC&&t>.62&&t<.9;const rain=t<.35||flame;const big=.8+R()*.7;const th=(flame?4.2:rain?3.2:2.6)*big;
+    Q.setFromAxisAngle(V.set(0,1,0),R()*6.28);M4.compose(V.set(x,0,z),Q,Sc.set(big,th,big));trunks.setMatrixAt(i,M4);
+    const cw=(flame?7.6:rain?5.2:3)*big,ch=(flame?2.1:rain?2.1:3.1)*big;
+    for(let k=0;k<2;k++){const ox=(R()-.5)*cw*.5,oz=(R()-.5)*cw*.5;const s=k?.72:1;
+      M4.compose(V.set(x+ox*k,th+ch*.55+k*ch*.35,z+oz*k),Q,Sc.set(cw*s,ch*s,cw*s*(.85+R()*.3)));leaves.setMatrixAt(li,M4);
+      col.setHSL(.22+R()*.09,.35+R()*.25,.11+R()*.10);if(flame){col.setHSL(.25+R()*.04,.5,.2+R()*.06);if(R()<.035)col.setHSL(.03+R()*.02,.85,.42)}else if(R()<.012)col.setHSL(.93+R()*.05,.5,.38);leaves.setColorAt(li,col);li++}});
+  leaves.count=li;[trunks,leaves].forEach(m=>{m.castShadow=true;m.receiveShadow=true;scene.add(m)});leaves.instanceColor.needsUpdate=true;
+  window.__treeCount=N}
+
+/* ---------- palms along Inchaimee Rd (seen in street photos of the campus frontage) ---------- */
+{const pts=[];roads.filter(r=>/อินใจมี$/.test(r.n)).forEach(r=>{let acc=6;const g=r.g;for(let i=1;i<g.length;i++){const a=g[i-1],b=g[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),dx=(b[0]-a[0])/L,dz=(b[1]-a[1])/L;
+    for(;acc<L;acc+=12){const x0=a[0]+dx*acc,z0=a[1]+dz*acc;if(x0<-60||x0>620)continue;[-1,1].forEach(sd=>{const off=sd*(r.w/2+3.6);const x=x0-dz*off,z=z0+dx*off;if(!blocked(x,z,1.2))pts.push([x,z])})}acc-=L}});
+  const N=pts.length;if(N){const tg=new THREE.CylinderGeometry(.17,.26,1,7);tg.translate(0,.5,0);
+  const fr=[];for(let k=0;k<11;k++){const f=new THREE.BoxGeometry(3.4,.05,.62);f.translate(1.7,0,0);f.rotateZ(-.32-(k%3)*.12);f.rotateY(k/11*Math.PI*2);fr.push(f.toNonIndexed())}
+  const pos=[];fr.forEach(f=>pos.push(...f.attributes.position.array));const fg=new THREE.BufferGeometry();fg.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));fg.computeVertexNormals();
+  const trunks=new THREE.InstancedMesh(tg,S({color:'#8c8274',roughness:.9}),N),fronds=new THREE.InstancedMesh(fg,mat.leaf,N);const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),V=new THREE.Vector3(),Sc=new THREE.Vector3(),col=new THREE.Color();
+  pts.forEach(([x,z],i)=>{const h=8+R()*3;Q.setFromAxisAngle(V.set(0,1,0),R()*6.28);M.compose(V.set(x,0,z),Q,Sc.set(1,h,1));trunks.setMatrixAt(i,M);M.compose(V.set(x,h,z),Q,Sc.set(1,1,1));fronds.setMatrixAt(i,M);fronds.setColorAt(i,col.setHSL(.25,.45,.22+R()*.06))});
+  [trunks,fronds].forEach(m=>{m.castShadow=true;scene.add(m)})}}
+
+/* ---------- street lamps ---------- */
+const lampPos=[];
+roads.forEach(r=>{if(!(r.main||(r.inC&&r.t==='se')))return;const step=r.main?34:28;let acc=step/2;const g=r.g;
+  for(let i=1;i<g.length;i++){const a=g[i-1],b=g[i],L=Math.hypot(b[0]-a[0],b[1]-a[1]),dx=(b[0]-a[0])/L,dz=(b[1]-a[1])/L;
+    for(;acc<L;acc+=step){const side=(lampPos.length%2?1:-1)*(r.w/2+(r.main?2.2:1.2));const x=a[0]+dx*acc-dz*side,z=a[1]+dz*acc+dx*side;
+      if(!blocked(x,z,.5))lampPos.push([x,z,-dz*Math.sign(side),dx*Math.sign(side)])}acc-=L}});
+{const N=lampPos.length;const pg=new THREE.CylinderGeometry(.09,.14,7.5,6);pg.translate(0,3.75,0);const hg=new THREE.BoxGeometry(1.4,.22,.45);
+  const poles=new THREE.InstancedMesh(pg,mat.pole,N),heads=new THREE.InstancedMesh(hg,mat.pole,N);const M4=new THREE.Matrix4(),Q=new THREE.Quaternion(),V=new THREE.Vector3(),O=new THREE.Vector3(1,1,1);
+  const gp=[];lampPos.forEach(([x,z,nx,nz],i)=>{Q.setFromAxisAngle(V.set(0,1,0),Math.atan2(-nz,nx));M4.compose(V.set(x,0,z),Q,O);poles.setMatrixAt(i,M4);
+    M4.compose(V.set(x-nx*.6,7.45,z-nz*.6),Q,O);heads.setMatrixAt(i,M4);gp.push(x-nx*.8,7.2,z-nz*.8)});
+  poles.castShadow=true;scene.add(poles,heads);
+  const lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(gp,3));
+  var lampGlow=new THREE.Points(lg,new THREE.PointsMaterial({map:GLOW,color:'#ffc77a',size:9,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false}));scene.add(lampGlow);
+  /* pools of light on the ground */
+  const pool=new THREE.Points(lg.clone(),new THREE.PointsMaterial({map:GLOW,color:'#ff9f4a',size:16,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false}));
+  pool.geometry.attributes.position.array.forEach((v,i,a)=>{if(i%3===1)a[i]=.6});scene.add(pool);
+  var lampPool=pool}
+
+/* ---------- traffic ---------- */
+function mkPath(pts){const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));return {pts,cum,L:cum[cum.length-1]}}
+function at(p,s){s=clamp(s,0,p.L);let i=1;while(i<p.cum.length-1&&p.cum[i]<s)i++;const a=p.pts[i-1],b=p.pts[i],seg=p.cum[i]-p.cum[i-1]||1,t=(s-p.cum[i-1])/seg;
+  const dx=(b[0]-a[0])/seg,dz=(b[1]-a[1])/seg;return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,dx,dz]}
+const carPaths=roads.filter(r=>(r.main||r.t==='un'||r.t==='te'||(r.inC&&r.t==='se'))&&r.g.length>1).map(r=>Object.assign(mkPath(r.g),{w:r.w,main:r.main,inC:r.inC})).filter(p=>p.L>60);
+const walkPaths=roads.filter(r=>r.inC&&r.g.length>1).map(r=>Object.assign(mkPath(r.g),{w:r.w})).filter(p=>p.L>40);
+const NC=MOBILE?34:60,cars=[];
+for(let i=0;i<NC;i++){const p=carPaths[(R()*carPaths.length)|0];cars.push({p,s:R()*p.L,dir:R()<.5?1:-1,v:(p.main?9:p.inC?4.5:7)*(.8+R()*.4),moto:R()<.4})}
+const bodyG=new THREE.BoxGeometry(4.3,.8,1.8);bodyG.translate(0,.72,0);const cabG=new THREE.CylinderGeometry(.62,.86,2.3,4,1);cabG.rotateY(Math.PI/4);cabG.rotateZ(Math.PI/2);cabG.scale(1,1,1.38);cabG.rotateZ(-Math.PI/2);cabG.scale(1.25,.62,1);cabG.translate(-.2,1.43,0);
+const wheelG=new THREE.CylinderGeometry(.34,.34,.24,12);wheelG.rotateX(Math.PI/2);const WOFF=[[1.35,.34,.86],[1.35,.34,-.86],[-1.35,.34,.86],[-1.35,.34,-.86]];
+const motoG=new THREE.BoxGeometry(1.9,1.1,.55);motoG.translate(0,.75,0);
+const carB=new THREE.InstancedMesh(bodyG,mat.car,NC),carC=new THREE.InstancedMesh(cabG,mat.glass,NC),motoB=new THREE.InstancedMesh(motoG,mat.car,NC);
+{const col=new THREE.Color();const pal=['#f4f4f2','#c9ccd0','#1f2226','#8d1d22','#24426e','#e7e1d4','#5c6b70','#b3b8bc','#f1c232'];
+  for(let i=0;i<NC;i++){col.set(pal[(R()*pal.length)|0]);carB.setColorAt(i,col);motoB.setColorAt(i,col.set(pal[(R()*pal.length)|0]))}}
+const carW=new THREE.InstancedMesh(wheelG,S({color:'#151515',roughness:.8}),NC*4);
+[carB,carC,motoB,carW].forEach(m=>{m.castShadow=true;m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(m)});
+const headG=new THREE.BufferGeometry();headG.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(NC*3),3));
+const tailG=new THREE.BufferGeometry();tailG.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(NC*3),3));
+const headP=new THREE.Points(headG,new THREE.PointsMaterial({map:GLOW,color:'#fff3d6',size:2.2,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false}));
+const tailP=new THREE.Points(tailG,new THREE.PointsMaterial({map:GLOW,color:'#ff3b2f',size:1.4,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false}));
+headP.frustumCulled=tailP.frustumCulled=false;scene.add(headP,tailP);
+
+/* ---------- people: articulated walkers with swinging arms/legs, groups, idle chatters, umbrellas in rain ---------- */
+const NW=MOBILE?110:230,people=[];
+const SKIN=['#b07a55','#9e6a48','#c48b65','#8a5a3e','#cf9a74','#7a4c33'],HAIR=['#141110','#1d1612','#2a1d15','#3b2a1e','#141110','#6b4a2e'];
+const CASUAL=['#2b3a63','#7a4a9a','#c0392b','#3c3c3c','#e8c547','#4f7d5a','#d98aa0','#5b8fb9','#f0eee8'];
+function newPerson(p,s,dir,side,v,look){return Object.assign({p,s,dir,side,v,ph:R()*6.28,idle:false,yaw0:0},look)}
+function look(){const uniform=R()<.72,skirt=R()<.5;return {uniform,skirt,h:(skirt?.92:.98)+R()*.1,
+  shirt:uniform?'#f4f4f1':CASUAL[(R()*CASUAL.length)|0],low:uniform?(R()<.8?'#16181c':'#1f2b45'):['#22252b','#34496b','#5a4b3a','#2e3136'][(R()*4)|0],
+  skin:SKIN[(R()*SKIN.length)|0],hair:HAIR[(R()*HAIR.length)|0],long:skirt&&R()<.7,shoe:R()<.6?'#141414':'#e9e9e6',bag:R()<.45,bagC:['#20242a','#3d4f6b','#6b3a3a','#2f4a3a','#c8a25a'][(R()*5)|0],
+  umb:['#1f3d73','#b33a3a','#2e2e2e','#e2b23a','#4d7f5e','#7a4a9a','#d2d2d2'][(R()*7)|0]}}
+/* walkers, often in small groups */
+while(people.length<NW){const p=walkPaths[(R()*walkPaths.length)|0];const g=R()<.35?2+((R()*2)|0):1;const dir=R()<.5?1:-1,s=R()*p.L,v=1.05+R()*.45;const sb=(R()<.5?1:-1)*(p.w/2+1.1);
+  for(let k=0;k<g&&people.length<NW;k++)people.push(newPerson(p,clamp(s+(R()-.5)*.8,0,p.L),dir,sb+Math.sign(sb)*k*.75,v,look()))}
+/* idle groups chatting in front of named campus buildings */
+B.filter(b=>b.inC&&b.name).slice(0,MOBILE?6:12).forEach(b=>{const np=nearestRoad(b.c[0],b.c[1]);if(!np)return;
+  const ox=np[0]+(b.c[0]-np[0])*.18,oz=np[1]+(b.c[1]-np[1])*.18;const n=3+((R()*3)|0);
+  for(let k=0;k<n;k++){const a=k/n*6.28+R()*.3,r=.75+R()*.2;const x=ox+Math.cos(a)*r,z=oz+Math.sin(a)*r;if(blocked(x,z,.3))continue;
+    const pp=newPerson(null,0,1,0,0,look());pp.idle=true;pp.x=x;pp.z=z;pp.yaw0=Math.atan2(-(oz-z),(ox-x));people.push(pp)}});
+const NP=people.length;
+const G={};
+G.torso=new THREE.CylinderGeometry(.165,.15,.54,12);G.torso.scale(.72,1,1.25);G.torso.translate(0,1.19,0);
+G.pants=new THREE.CylinderGeometry(.15,.16,.16,10);G.pants.scale(.8,1,1.2);G.pants.translate(0,.9,0);
+G.skirt=new THREE.CylinderGeometry(.155,.25,.5,12,1,true);G.skirt.scale(.85,1,1.1);G.skirt.translate(0,.7,0);
+G.neck=new THREE.CylinderGeometry(.045,.05,.1,8);G.neck.translate(0,1.5,0);
+G.head=new THREE.SphereGeometry(.105,14,10);G.head.scale(.95,1.15,.9);G.head.translate(0,1.62,0);
+G.hair=new THREE.SphereGeometry(.113,14,10,0,Math.PI*2,0,Math.PI*.58);G.hair.scale(1,1.12,.95);G.hair.translate(-.012,1.635,0);
+G.hairLong=new THREE.CylinderGeometry(.1,.12,.3,10,1,true,Math.PI*.5,Math.PI);G.hairLong.translate(-.03,1.5,0);
+G.leg=new THREE.CylinderGeometry(.07,.05,.84,8);G.leg.translate(0,-.42,0);
+G.shoe=new THREE.BoxGeometry(.25,.08,.1);G.shoe.translate(.05,-.86,0);
+G.arm=new THREE.CylinderGeometry(.048,.038,.6,7);G.arm.translate(0,-.3,0);
+G.hand=new THREE.SphereGeometry(.045,8,6);G.hand.translate(0,-.63,0);
+G.bag=new THREE.BoxGeometry(.13,.34,.27);G.bag.translate(-.17,1.2,0);
+G.umb=new THREE.ConeGeometry(.62,.28,14,1,true);G.umb.translate(0,2.12,0);
+G.stick=new THREE.CylinderGeometry(.012,.012,.9,5);G.stick.translate(0,1.75,0);
+const pm=new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.75});
+const pmD=new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.6,side:THREE.DoubleSide});
+const IM={};const parts={torso:1,pants:1,skirt:1,neck:1,head:1,hair:1,hairLong:1,bag:1,umb:1,stick:1,leg:2,shoe:2,arm:2,hand:2};
+for(const k in parts){IM[k]=new THREE.InstancedMesh(G[k],/skirt|umb|hairLong/.test(k)?pmD:pm,NP*parts[k]);IM[k].castShadow=!/stick/.test(k);IM[k].receiveShadow=true;
+  IM[k].instanceMatrix.setUsage(THREE.DynamicDrawUsage);IM[k].frustumCulled=false;scene.add(IM[k])}
+{const c=new THREE.Color();people.forEach((p,i)=>{
+  IM.torso.setColorAt(i,c.set(p.shirt));IM.pants.setColorAt(i,c.set(p.low));IM.skirt.setColorAt(i,c.set(p.low));IM.neck.setColorAt(i,c.set(p.skin));
+  IM.head.setColorAt(i,c.set(p.skin));IM.hair.setColorAt(i,c.set(p.hair));IM.hairLong.setColorAt(i,c.set(p.hair));IM.bag.setColorAt(i,c.set(p.bagC));
+  IM.umb.setColorAt(i,c.set(p.umb));IM.stick.setColorAt(i,c.set('#333333'));
+  for(let s=0;s<2;s++){IM.leg.setColorAt(i*2+s,c.set(p.skirt?p.skin:p.low));IM.shoe.setColorAt(i*2+s,c.set(p.shoe));IM.arm.setColorAt(i*2+s,c.set(p.shirt));IM.hand.setColorAt(i*2+s,c.set(p.skin))}})}
+const PZ=new THREE.Matrix4().makeScale(0,0,0),PB=new THREE.Matrix4(),PL=new THREE.Matrix4(),PM=new THREE.Matrix4(),PQ=new THREE.Quaternion(),PV=new THREE.Vector3(),PS=new THREE.Vector3();
+function updatePeople(dt,now){const showFrac=raining?.45:nightF>.5?.3:1;
+  people.forEach((p,i)=>{const vis=p.idle?!(raining||nightF>.5):((i/NP)<showFrac);
+    if(!vis){for(const k in parts)for(let s=0;s<parts[k];s++)IM[k].setMatrixAt(i*parts[k]+s,PZ);return}
+    let x,z,yaw,swing,bob=0,sway=0;
+    if(p.idle){x=p.x;z=p.z;yaw=p.yaw0+Math.sin(now/1900+p.ph)*.25;swing=Math.sin(now/700+p.ph)*.05;sway=Math.sin(now/1300+p.ph)*.02}
+    else{const v=p.v*(raining?.85:1);p.s+=v*p.dir*dt;if(p.s>p.p.L||p.s<0){p.dir*=-1;p.s=clamp(p.s,0,p.p.L)}
+      const r=at(p.p,p.s);const dx=r[2]*p.dir,dz=r[3]*p.dir;x=r[0]-r[3]*p.side;z=r[1]+r[2]*p.side;
+      yaw=Math.atan2(-dz,dx);p.ph+=dt*v/.72*Math.PI;swing=Math.sin(p.ph)*.42*clamp(v/1.3,.6,1.2);bob=Math.abs(Math.cos(p.ph))*.035;sway=Math.sin(p.ph)*.025}
+    PQ.setFromAxisAngle(UP,yaw);PB.compose(PV.set(x,bob,z),PQ,PS.set(1,p.h,1));
+    const PBr=PM.multiplyMatrices(PB,PL.makeRotationX(sway)).clone();
+    IM.torso.setMatrixAt(i,PBr);IM.neck.setMatrixAt(i,PBr);IM.head.setMatrixAt(i,PBr);IM.hair.setMatrixAt(i,PBr);
+    IM.hairLong.setMatrixAt(i,p.long?PBr:PZ);IM.pants.setMatrixAt(i,p.skirt?PZ:PB);IM.skirt.setMatrixAt(i,p.skirt?PB:PZ);IM.bag.setMatrixAt(i,p.bag?PBr:PZ);
+    const umb=raining&&!p.idle;IM.umb.setMatrixAt(i,umb?PB:PZ);IM.stick.setMatrixAt(i,umb?PB:PZ);
+    for(let s=0;s<2;s++){const sg=s?1:-1;
+      PL.makeRotationZ(swing*sg);PL.setPosition(0,.9,.09*sg);PM.multiplyMatrices(PB,PL);IM.leg.setMatrixAt(i*2+s,PM);IM.shoe.setMatrixAt(i*2+s,PM);
+      const as=umb&&s===0?.95:-swing*sg*.85;PL.makeRotationZ(as);PL.setPosition(0,1.43,.215*sg);PM.multiplyMatrices(PB,PL);
+      IM.arm.setMatrixAt(i*2+s,PM);IM.hand.setMatrixAt(i*2+s,PM)}});
+  for(const k in parts)IM[k].instanceMatrix.needsUpdate=true}
+
+/* ---------- Google Maps coordinate beacon ---------- */
+const beacon=new THREE.Mesh(new THREE.RingGeometry(5,6.2,48),mat.beacon);beacon.rotation.x=-Math.PI/2;beacon.position.set(PIN.uni[0],.5,PIN.uni[1]);scene.add(beacon);
+const beacon2=beacon.clone();scene.add(beacon2);
+
+/* ---------- rain ---------- */
+const RN=MOBILE?2500:6000;const rainG=new THREE.BufferGeometry();const rainArr=new Float32Array(RN*6);
+for(let i=0;i<RN;i++){const x=(R()-.5)*260,y=R()*120,z=(R()-.5)*260;rainArr.set([x,y,z,x+.15,y-1.6,z],i*6)}
+rainG.setAttribute('position',new THREE.BufferAttribute(rainArr,3));
+const rain=new THREE.LineSegments(rainG,new THREE.LineBasicMaterial({color:'#b8c8d8',transparent:true,opacity:.45,depthWrite:false}));rain.visible=false;rain.frustumCulled=false;scene.add(rain);
+
+/* ---------- tour stops ---------- */
+const byName=n=>B.find(b=>b.osm===n)||null;
+const STOPS=[
+ {key:'sign',t:'ป้ายมหาวิทยาลัย',sub:'ทางเข้าจากถนนอินใจมี',c:SIGN,h:5,a:350,desc:'ป้ายชื่อมหาวิทยาลัยราชภัฏอุตรดิตถ์ ภาษาไทยและอังกฤษ ทำแบบตามลักษณะป้ายในภาพถ่าย คือแผ่นหินสีเข้ม อักษรสีทอง กรอบสีครีมพร้อมหน้าจั่ว และแปลงดอกไม้ด้านหน้า ตำแหน่งวางไว้ข้างถนนทางเข้าโดยประมาณ'},
+ {n:'คณะครุศาสตร์ อาคาร9',sub:'คณะครุศาสตร์ หลังใหม่'},
+ {key:'pos:gym',t:'โรงยิมเนเซี่ยม',sub:'ทิศเหนือของอาคาร ED'},
+ {key:'b9',t:'อาคาร 9',sub:'หลังคาสีฟ้า ถัดจากอาคาร ED'},
+ {key:'b8',t:'อาคาร 8',sub:'หลังคาสีฟ้า ถัดจากอาคาร 9'},
+ {key:'trackN',t:'สนามหน้ามหาวิทยาลัย',sub:'สนามกีฬาและลู่วิ่ง · ศาลาแสงศิริ',c:[131,-230],h:2,a:22000,desc:'สนามกีฬาหลักของมหาวิทยาลัย ใช้จัดกีฬาหางนกยูงเกมส์ ภายในสนามมีศาลาแสงศิริ ศาลาทรงไทยที่สร้างเป็นเกียรติแก่อธิการคนแรก (ตำแหน่งศาลาในแบบจำลองเป็นค่าประมาณ)'},
+ {n:'นานาชาติ',sub:'4 ชั้น · โดมบนหลังคา'},
+ {n:'ตึกคณะมนุษย์',sub:'คณะครุศาสตร์ (อาคารเดิม)'},
+ {n:'อาคาร10',sub:'ติดอาคารภูมิราชภัฏ'},
+ {n:'อาคารภูมิราชภัฏ',sub:'9 ชั้น · สูงที่สุดในมหาวิทยาลัย'},
+ {n:'ตึกมนุษยศาสตร์',sub:'คณะมนุษยศาสตร์และสังคมศาสตร์'},
+ {n:'ตึกวิทยการจัดการ',sub:'อาคารทรงโค้ง'},
+ {key:'pin',t:'หมุดมหาวิทยาลัยใน Google Maps',sub:'จุดที่ Google Maps ปักชื่อมหาวิทยาลัย',c:PIN.uni,h:2,a:600,desc:'ตำแหน่งหมุดของ "มหาวิทยาลัยราชภัฏอุตรดิตถ์" ใน Google Maps (17.63349, 100.09353) อยู่กลางวิทยาเขต ใกล้อาคาร 6 และอาคาร 10'},
+ {n:'ตึก ท.อ',sub:'คณะเทคโนโลยีอุตสาหกรรม'},
+ {n:'อาคารเทคโนโลยี',sub:'คณะเทคโนโลยีอุตสาหกรรม'},
+ {n:'อาคารโรงงาน',sub:'โรงฝึกปฏิบัติ'},
+ {n:'โรงอาหาร',sub:'ศูนย์อาหาร'},
+ {key:'pos:sci',t:'อุทยานวิทยาศาสตร์ภาคเหนือ',sub:'ศูนย์วิทยาศาสตร์และเทคโนโลยี'},
+ {key:'pos:arit',t:'สำนักวิทยบริการฯ (ARIT)',sub:'หอสมุดกลาง · 6 ชั้น'},
+ {n:'ห้องประชุม',sub:'ทรงไทยประยุกต์ 1 ชั้น'},
+ {key:'pool',t:'สระว่ายน้ำเฉลิมราชภัฏ',sub:'สระว่ายน้ำของมหาวิทยาลัย',c:PIN.pool,h:2,a:1300,desc:'สระว่ายน้ำเฉลิมราชภัฏ ตำแหน่งตามหมุด Google Maps ที่ส่งมา รูปทรงสระมาจาก OpenStreetMap'},
+ {key:'dome',t:'โดมกีฬาสนามหลัง',sub:'โดมกีฬาหลังคาโค้ง'},
+ {key:'trackS',t:'สนามกีฬา (ทิศใต้)',sub:'ลู่วิ่งใกล้หอพัก',c:[64,437],h:2,a:12000,desc:'ลู่วิ่งและสนามหญ้าทางทิศใต้ของวิทยาเขต ใกล้กลุ่มหอพักนักศึกษา'},
+ {n:'หอพักเฉลิมพระเกียรติ 14 (อินทนิล)',sub:'หอพักนักศึกษา'},
+ {n:'หอ 15(บ้านกาสลอง)',sub:'หอพักนักศึกษา'},
+ {key:'pos:school',t:'โรงเรียนสาธิตมหาวิทยาลัยราชภัฏอุตรดิตถ์',sub:'ริมถนนอินใจมี'},
+ {key:'mon',t:'อนุสาวรีย์พระยาพิชัยดาบหัก',sub:'นอกมหาวิทยาลัย · ถนนประชานิมิตร',c:MON,h:12,a:900,desc:'สถานที่สำคัญของจังหวัด อยู่ฝั่งตะวันออกของมหาวิทยาลัย ติดสนามกีฬาพระยาพิชัยดาบหัก รูปปั้นในแบบจำลองเป็นรูปทรงอย่างง่าย ไม่ใช่รูปจำลองของจริง'},
+].map(s=>{if(s.n){const i=byName(s.n);return i?{t:i.name,sub:s.sub,c:i.c,h:i.h,a:i.a,info:i,desc:i.desc}:null}if(s.key&&s.key.startsWith('pos:')){const pc=PIN[s.key.slice(4)];const i=B.filter(b=>!b.alias).sort((p,q)=>Math.hypot(p.c[0]-pc[0],p.c[1]-pc[1])-Math.hypot(q.c[0]-pc[0],q.c[1]-pc[1]))[0];return {t:s.t,sub:s.sub,c:pc,h:i.h,a:i.a,info:i,desc:i.desc}}
+  if(s.key==='dome'){const i=B.find(b=>b.kind==='dome');return {t:s.t,sub:s.sub,c:i.c,h:i.h,a:i.a,info:i,desc:i.desc}}
+  if(s.key==='b8'||s.key==='b9'){const C0=s.key==='b8'?B8_C:B9_C;const i=B.find(b=>Math.hypot(b.c[0]-C0[0],b.c[1]-C0[1])<6);if(i)return {t:s.t,sub:s.sub,c:i.c,h:i.h,a:i.a,info:i,desc:i.desc}}return s}).filter(Boolean);
+
+const listEl=$('stops'),labelsEl=$('labels');$('count').textContent=STOPS.length+' จุด';
+STOPS.forEach((s,i)=>{const li=document.createElement('li');
+  li.innerHTML=`<button class="stop" type="button"><span class="n">${String(i+1).padStart(2,'0')}</span><span class="t">${s.t}<small>${s.sub}</small></span></button>`;
+  s.li=li;s.btn=li.firstChild;s.btn.onclick=()=>{stopModes();go(i)};listEl.appendChild(li);
+  const l=document.createElement('div');l.className='lbl glass'+(s.key==='pin'?' pin':'');l.innerHTML=`<b>${i+1}</b><span>${s.t}</span>`;l.onclick=()=>{stopModes();go(i)};labelsEl.appendChild(l);s.lbl=l});
+$('search').addEventListener('input',e=>{const q=e.target.value.trim();STOPS.forEach(s=>{s.li.hidden=q&&!(s.t+s.sub).includes(q)})});
+$('search').addEventListener('keydown',e=>{if(e.key==='Enter'){const i=STOPS.findIndex(s=>!s.li.hidden);if(i>=0){stopModes();go(i)}}});
+
+/* ---------- card ---------- */
+function showCard(eb,title,text,info,c){$('cEyebrow').textContent=eb;$('cTitle').textContent=title;$('cText').textContent=text;const f=$('cFacts');
+  if(info){f.hidden=false;const typ=info.type==='dormitory'?'หอพัก':info.type==='house'?'บ้านพัก':info.type==='school'?'โรงเรียน':'อาคาร';
+    const srcT={wiki:'จากวิกิพีเดีย',photo:'เทียบจากภาพถ่าย',est:'ประมาณการ'}[info.src||'est'];
+    f.innerHTML=`<div><dt>พื้นที่ฐาน</dt><dd>${Math.round(info.a).toLocaleString('th-TH')} ตร.ม.</dd></div><div><dt>จำนวนชั้น</dt><dd>${info.floors||Math.max(1,Math.round(info.h/3.5))} ชั้น</dd></div><div><dt>ข้อมูลชั้น</dt><dd style="font-size:12px">${srcT}</dd></div>`}
+  else{const [la,lo]=toLL(c[0],c[1]);f.hidden=false;f.innerHTML=`<div><dt>ละติจูด</dt><dd>${la.toFixed(5)}</dd></div><div><dt>ลองจิจูด</dt><dd>${lo.toFixed(5)}</dd></div><div><dt>อาคาร</dt><dd>${B.filter(b=>b.inC).length} หลัง</dd></div>`}
+  $('gmLink').href=gm(c[0],c[1]);$('svLink').href=sv(c[0],c[1]);setCardInfo(info)}
+
+/* ---------- highlighting ---------- */
+let hl=null;
+function highlight(info){if(hl){hl.list.forEach(([m,o,w])=>{m.material=o;w.dispose()});hl=null}
+  ringAt(info?info.c:null,info?info.a:0);if(!info)return;const gold=getComputedStyle(document.documentElement).getPropertyValue('--gold').trim()||'#e5b75a';
+  hl={list:[info.mesh,...(info.extra||[])].map(m=>{const o=m.material;const w=o[1].clone();w.emissive=new THREE.Color(gold);w.emissiveMap=null;w.emissiveIntensity=.22;m.material=[o[0],w];return [m,o,w]})}}
+const selRing=new THREE.Mesh(new THREE.RingGeometry(.92,1,64),new THREE.MeshBasicMaterial({color:'#ffcf5a',transparent:true,opacity:.8,toneMapped:false,depthWrite:false}));selRing.rotation.x=-Math.PI/2;selRing.position.y=.6;selRing.visible=false;scene.add(selRing);
+function ringAt(c,a){if(!c){selRing.visible=false;return}selRing.visible=true;selRing.position.set(c[0],.6,c[1]);selRing.userData.r=Math.sqrt((a||400)/Math.PI)+10}
+
+/* ---------- camera flights ---------- */
+let fly=null;
+function flyTo(pos,tgt,dur=1800,mid=null){fly={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos,t1:tgt,mid,s:performance.now(),d:REDUCED?1:dur}}
+let cur=-1;
+function viewFor(s){const r=Math.max(70,Math.sqrt(s.a||900)*2.4);const tgt=new THREE.Vector3(s.c[0],s.h*.45,s.c[1]);
+  return [new THREE.Vector3(s.c[0]-.55*r,Math.max(28,r*.62),s.c[1]+.83*r),tgt]}
+function select(i){cur=i;STOPS.forEach((x,k)=>{x.btn.classList.toggle('on',k===cur);x.lbl.classList.toggle('on',k===cur)})}
+function go(i){i=(i+STOPS.length)%STOPS.length;select(i);const s=STOPS[i];
+  if(walk){walkTo(s)}else{const [p,t]=viewFor(s);flyTo(p,t)}
+  s.btn.scrollIntoView({block:'nearest',behavior:REDUCED?'auto':'smooth'});highlight(s.info||null);
+  showCard(`จุดที่ ${i+1} / ${STOPS.length}`,s.t,s.desc||s.sub,s.info||null,s.c)}
+const OVER=[new THREE.Vector3(-300,330,520),new THREE.Vector3(70,0,20)];
+function overview(dur=2000){select(-1);highlight(null);if(walk)setWalk(false);flyTo(OVER[0].clone(),OVER[1].clone(),dur);
+  showCard('ภาพรวม','มหาวิทยาลัยราชภัฏอุตรดิตถ์','วิทยาเขตตั้งอยู่ระหว่างถนนอินใจมีกับถนนเจษฎาบดินทร์ เส้นทาง อาคาร สนามกีฬา และสระน้ำในแบบจำลองมาจาก OpenStreetMap',null,PIN.uni)}
+
+/* ---------- walk mode ---------- */
+let walk=false,yaw=0,pitch=0,wfly=null;const keys={};
+function setWalk(on,from){walk=on;$('walkBtn').setAttribute('aria-pressed',on);controls.enabled=!on;$('joy').hidden=!(on&&MOBILE);$('whint').hidden=!on||MOBILE;
+  if(on){fly=null;const np=nearestRoad(from?from[0]:controls.target.x,from?from[1]:controls.target.z);let px=np[0],pz=np[1];
+    for(let k=0;k<40&&blocked(px,pz,1);k++){px+=(R()-.5)*k*2;pz+=(R()-.5)*k*2}
+    yaw=Math.atan2(-np[2],-np[3]);pitch=-.03;
+    wfly={p0:camera.position.clone(),p1:new THREE.Vector3(px,1.7,pz),q0:camera.quaternion.clone(),s:performance.now(),d:REDUCED?1:1600};
+    controls.maxPolarAngle=Math.PI*.49}
+  else{wfly=null;const f=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));const t=camera.position.clone().addScaledVector(f,40);t.y=0;
+    controls.target.copy(t);flyTo(t.clone().add(new THREE.Vector3(-.55*110,80,.83*110)),t,1400)}}
+function nearestRoad(x,z){let best=null,bd=1e9;roads.forEach(r=>{for(let i=1;i<r.g.length;i++){const A=r.g[i-1],Bp=r.g[i],dx=Bp[0]-A[0],dz=Bp[1]-A[1],L2=dx*dx+dz*dz||1;
+    const t=clamp(((x-A[0])*dx+(z-A[1])*dz)/L2,0,1),px=A[0]+dx*t,pz=A[1]+dz*t,d=Math.hypot(x-px,z-pz);if(d<bd){bd=d;const L=Math.sqrt(L2);best=[px,pz,dx/L,dz/L]}}});return best}
+function walkTo(s){let best=null;const base=Math.sqrt(s.a||400)/2+16;
+  for(let k=0;k<16;k++){const ang=2.15+(k%2?1:-1)*Math.ceil(k/2)*.39;const x=s.c[0]+Math.cos(ang)*base,z=s.c[1]+Math.sin(ang)*base;if(!blocked(x,z,1.2)){best=[x,z];break}}
+  if(!best)best=[s.c[0]-base*.55,s.c[1]+base*.83];const dx=s.c[0]-best[0],dz=s.c[1]-best[1];
+  const y1=Math.atan2(-dx,-dz);wfly={p0:camera.position.clone(),p1:new THREE.Vector3(best[0],1.7,best[1]),y0:yaw,y1,pi0:pitch,pi1:Math.atan2(Math.min(s.h,14)*.5-1.7,Math.hypot(dx,dz)),s:performance.now(),d:REDUCED?1:1800}}
+addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;keys[e.code]=true;if(walk&&/Arrow|Space/.test(e.code))e.preventDefault()});
+addEventListener('keyup',e=>{keys[e.code]=false});
+let drag=null;
+renderer.domElement.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,x0:e.clientX,y0:e.clientY,id:e.pointerId};skipIntro()});
+addEventListener('pointermove',e=>{if(!walk||!drag||drag.id!==e.pointerId)return;yaw-=(e.clientX-drag.x)*.004;pitch=clamp(pitch-(e.clientY-drag.y)*.004,-1.2,1.2);drag.x=e.clientX;drag.y=e.clientY;wfly=null});
+/* joystick */
+let joy=null;const jEl=$('joy'),jK=$('joyK');
+jEl.addEventListener('pointerdown',e=>{joy={id:e.pointerId,x:0,y:0};jEl.setPointerCapture(e.pointerId);moveJoy(e);e.stopPropagation()});
+jEl.addEventListener('pointermove',e=>{if(joy&&joy.id===e.pointerId)moveJoy(e)});
+jEl.addEventListener('pointerup',()=>{joy=null;jK.style.transform=''});jEl.addEventListener('pointercancel',()=>{joy=null;jK.style.transform=''});
+function moveJoy(e){const r=jEl.getBoundingClientRect();let x=(e.clientX-r.left-r.width/2)/(r.width/2),y=(e.clientY-r.top-r.height/2)/(r.height/2);const l=Math.hypot(x,y);if(l>1){x/=l;y/=l}joy.x=x;joy.y=y;jK.style.transform=`translate(${x*36}px,${y*36}px)`}
+
+/* ---------- measure tool ---------- */
+let measuring=false,mA=null;const mGroup=new THREE.Group();scene.add(mGroup);const mLabel=document.createElement('div');mLabel.className='mlabel glass';mLabel.hidden=true;$('mlabels').appendChild(mLabel);let mMid=null;
+const mMat=new THREE.MeshBasicMaterial({color:'#ffcf5a',toneMapped:false,depthTest:false});const mLine=new THREE.LineBasicMaterial({color:'#ffcf5a',depthTest:false,toneMapped:false});
+function measureClick(p){if(!mA||mGroup.children.length>2){mGroup.clear();mLabel.hidden=true;mA=p.clone();const d=new THREE.Mesh(new THREE.SphereGeometry(1.2,12,8),mMat);d.position.copy(p);d.renderOrder=9;mGroup.add(d);return}
+  const d=new THREE.Mesh(new THREE.SphereGeometry(1.2,12,8),mMat);d.position.copy(p);d.renderOrder=9;mGroup.add(d);
+  const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints([mA,p]),mLine);l.renderOrder=9;mGroup.add(l);
+  const hd=Math.hypot(p.x-mA.x,p.z-mA.z),dy=Math.abs(p.y-mA.y);mLabel.textContent=`${hd.toFixed(1)} ม.`+(dy>1?` · สูงต่างกัน ${dy.toFixed(1)} ม.`:'')+`  ·  เดิน ~${Math.max(1,Math.round(hd/1.3/60))} นาที`;
+  mLabel.hidden=false;mMid=mA.clone().add(p).multiplyScalar(.5);mA=null}
+
+/* ---------- picking ---------- */
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2(),gPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+renderer.domElement.addEventListener('pointerup',e=>{const d=drag;drag=null;if(!d||Math.hypot(e.clientX-d.x0,e.clientY-d.y0)>6)return;
+  const r=renderer.domElement.getBoundingClientRect();mouse.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mouse,camera);
+  if(!measuring&&huntPick(ray))return;
+  const hit=ray.intersectObjects(pickables,false)[0];
+  if(measuring){const p=hit?hit.point.clone():ray.ray.intersectPlane(gPlane,new THREE.Vector3());if(p)measureClick(p);return}
+  if(!hit)return;const i=hit.object.userData.info;const si=STOPS.findIndex(s=>s.info===i);stopModes(true);
+  if(si>=0)return go(si);
+  highlight(i);select(-1);
+  showCard(i.inC?'อาคารในวิทยาเขต':'อาคารรอบมหาวิทยาลัย',i.name||((i.type==='dormitory'?'หอพัก':'อาคาร')+' (ไม่มีชื่อในแผนที่)'),i.desc||'รูปทรงฐานอาคารจาก OpenStreetMap ส่วนสี หลังคา และจำนวนชั้นเป็นค่าประมาณตามลักษณะอาคารส่วนใหญ่ในพื้นที่',i,i.c);
+  if(!walk){const t=new THREE.Vector3(i.c[0],i.h*.4,i.c[1]);const dir=camera.position.clone().sub(controls.target);const dist=clamp(dir.length(),Math.sqrt(i.a)*2.2+40,500);flyTo(t.clone().add(dir.setLength(dist)),t,1200)}});
+
+/* ---------- time of day (real solar position for Uttaradit) ---------- */
+const today=new Date();const doy=Math.floor((Date.UTC(today.getFullYear(),today.getMonth(),today.getDate())-Date.UTC(today.getFullYear(),0,0))/864e5);
+function sunPos(h){const decl=23.44*Math.sin(2*Math.PI*(284+doy)/365)*Math.PI/180;const Bq=2*Math.PI*(doy-81)/364;const eot=9.87*Math.sin(2*Bq)-7.53*Math.cos(Bq)-1.5*Math.sin(Bq);
+  const st=h+(4*(LON0-105)+eot)/60;const H=(15*(st-12))*Math.PI/180,phi=LAT0*Math.PI/180;
+  const el=Math.asin(Math.sin(phi)*Math.sin(decl)+Math.cos(phi)*Math.cos(decl)*Math.cos(H));
+  let az=Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(phi)-Math.tan(decl)*Math.cos(phi))+Math.PI;return {el,az,sunrise:12-(Math.acos(-Math.tan(phi)*Math.tan(decl))*180/Math.PI)/15-(4*(LON0-105)+eot)/60,
+    sunset:12+(Math.acos(-Math.tan(phi)*Math.tan(decl))*180/Math.PI)/15-(4*(LON0-105)+eot)/60}}
+const sunDir=new THREE.Vector3(),moonDir=new THREE.Vector3(.5,.75,-.45).normalize();
+let hour=16,raining=false,nightF=0,lastEnvKey='';const C=(h)=>new THREE.Color(h);
+const fogDay=C('#c6d5dc'),fogGold=C('#d8b48e'),fogNight=C('#0b121b'),fogRain=C('#7d8a93'),tmpC=new THREE.Color();
+const fmt=h=>{const H=Math.floor(h)%24,m=Math.floor((h%1)*60);return String(H).padStart(2,'0')+':'+String(m).padStart(2,'0')};
+function applyTime(){const sp=sunPos(hour);const e=sp.el*180/Math.PI;
+  sunDir.set(Math.cos(sp.el)*Math.sin(sp.az),Math.sin(sp.el),-Math.cos(sp.el)*Math.cos(sp.az));
+  SU.sunPosition.value.copy(sunDir);SU.turbidity.value=raining?16:lerp(8,4,smooth(0,30,e));SU.rayleigh.value=raining?.6:lerp(.5,1.6,smooth(-6,15,e));SU.mieCoefficient.value=raining?.02:.004;
+  const day=smooth(-4,12,e);nightF=1-smooth(-7,1,e);const gold=smooth(25,4,e)*smooth(-4,3,e);
+  const rf=raining?.35:1;
+  sun.intensity=(2.6*smooth(-1,10,e)*rf)+(.28*nightF);
+  sun.color.set(e>0?'#fff3e2':'#9fb4ff');if(e>0)sun.color.lerp(C('#ffb066'),gold);
+  hemi.intensity=.05+.35*day*(raining?.8:1)+.06*nightF;hemi.color.set(nightF>.5?'#40507a':'#cfe3f5');
+  tmpC.copy(fogDay).lerp(fogGold,gold).lerp(fogNight,nightF);if(raining)tmpC.lerp(fogRain,.7*(1-nightF)).lerp(fogNight,nightF*.9);
+  scene.fog.color.copy(tmpC);mountainMat1.color.copy(tmpC).lerp(C('#3f4e58'),.42*(1-nightF*.4));mountainMat2.color.copy(tmpC).lerp(C('#56656f'),.22*(1-nightF*.4));scene.fog.density=raining?.0019:.00042+.00025*gold;
+  renderer.toneMappingExposure=(raining?.5:.4)+.5*nightF;
+  const night=smooth(.15,.9,nightF);wallList.forEach(m=>m.emissiveIntensity=1.4*night+.35*smooth(.05,.4,nightF));
+  lampGlow.material.opacity=night;lampPool.material.opacity=.32*night;headP.material.opacity=Math.max(night,raining?.35:0);tailP.material.opacity=headP.material.opacity;
+  stars.material.opacity=raining?0:night*.9;
+  mat.road.roughness=raining?.28:.92;mat.road.metalness=raining?.15:0;mat.road.color.set(raining?'#9c9fa3':'#ffffff');
+  $('clockTime').textContent=fmt(hour);
+  $('sunInfo').innerHTML=e>0?`ดวงอาทิตย์สูง ${e.toFixed(0)}°<br>ตก ${fmt(sp.sunset)} น.`:`กลางคืน<br>ขึ้น ${fmt(sp.sunrise)} น.`;
+  const k=Math.round(e/2)+'|'+raining;if(k!==lastEnvKey){lastEnvKey=k;rebuildEnv()}}
+$('timeRange').addEventListener('input',e=>{hour=+e.target.value;lapse=false;$('lapseBtn').setAttribute('aria-pressed','false');applyTime()});
+$('nowBtn').onclick=()=>{const d=new Date();const bkk=new Date(d.getTime()+(d.getTimezoneOffset()+420)*6e4);hour=bkk.getHours()+bkk.getMinutes()/60;$('timeRange').value=hour;applyTime()};
+let lapse=false;$('lapseBtn').onclick=()=>{lapse=!lapse;$('lapseBtn').setAttribute('aria-pressed',lapse)};
+$('rainBtn').onclick=()=>{raining=!raining;$('rainBtn').setAttribute('aria-pressed',raining);rain.visible=raining;applyTime()};
+
+/* ---------- modes: tour, drone ---------- */
+let touring=false,tourT=0,drone=false,droneA=0;const DWELL=8000;
+function stopModes(keepWalk){if(touring){touring=false;$('tourBtn').textContent='▶ ทัวร์อัตโนมัติ';$('prog').hidden=true}if(drone){drone=false;$('droneBtn').setAttribute('aria-pressed','false')}}
+$('tourBtn').onclick=()=>{if(touring)return stopModes();stopModes();touring=true;$('tourBtn').textContent='❚❚ หยุดทัวร์';$('prog').hidden=false;go(cur<0?0:cur+1);tourT=performance.now()};
+$('droneBtn').onclick=()=>{const on=!drone;stopModes();if(!on)return;if(walk)setWalk(false);drone=true;$('droneBtn').setAttribute('aria-pressed','true');
+  droneA=Math.atan2(camera.position.z-80,camera.position.x-60);select(-1);highlight(null);
+  showCard('โดรนบินวน','มุมสูงรอบวิทยาเขต','กล้องบินวนรอบมหาวิทยาลัยต่อเนื่อง ลองปรับเวลาเป็นช่วงเย็นหรือเปิดไทม์แลปส์ระหว่างบิน',null,[60,80])};
+$('nextBtn').onclick=()=>{go(cur+1);tourT=performance.now()};
+$('prevBtn').onclick=()=>{go(cur<0?STOPS.length-1:cur-1);tourT=performance.now()};
+$('overBtn').onclick=()=>{stopModes();overview()};
+$('walkBtn').onclick=()=>{stopModes();if(walk)setWalk(false);else{setWalk(true,cur>=0?null:null);showCard('เดินชม','มุมมองระดับสายตา',MOBILE?'ใช้จอยสติ๊กซ้ายล่างเพื่อเดิน ลากจอเพื่อมองรอบ':'กด W A S D หรือลูกศรเพื่อเดิน Shift เพื่อวิ่ง ลากเมาส์เพื่อมองรอบ แตะอาคารเพื่อดูข้อมูล',null,[camera.position.x,camera.position.z])}};
+$('measureBtn').onclick=()=>{measuring=!measuring;$('measureBtn').setAttribute('aria-pressed',measuring);if(!measuring){mGroup.clear();mLabel.hidden=true;mA=null}
+  else showCard('เครื่องมือวัดระยะ','คลิกสองจุดบนแผนที่','แสดงระยะทางเป็นเมตรและเวลาเดินโดยประมาณ คลิกจุดที่สามเพื่อเริ่มวัดใหม่',null,[controls.target.x,controls.target.z])};
+$('toggleList').onclick=()=>{const l=$('list');l.hidden=!l.hidden;$('card').hidden=!l.hidden};
+if(MOBILE)$('list').hidden=true;
+
+/* ---------- minimap ---------- */
+const mm=$('mm'),mmx=mm.getContext('2d');const MW=MOBILE?100:206,MX0=-500,MZ0=-700,MSPAN=1200,MZS=1550;const MH=Math.round(MW*MZS/MSPAN);
+const dpr=Math.min(devicePixelRatio,2);mm.width=MW*dpr;mm.height=MH*dpr;mm.style.width=MW+'px';mm.style.height=MH+'px';
+const base=document.createElement('canvas');base.width=mm.width;base.height=mm.height;{const x=base.getContext('2d');const k=MW*dpr/MSPAN;const P=p=>[(p[0]-MX0)*k,(p[1]-MZ0)*k];
+  const poly=(g,f,s)=>{x.beginPath();g.forEach((p,i)=>{const q=P(p);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])});x.closePath();if(f){x.fillStyle=f;x.fill()}if(s){x.strokeStyle=s;x.lineWidth=1.5*dpr;x.stroke()}};
+  x.fillStyle='#cfd5bf';x.fillRect(0,0,base.width,base.height);poly(campus,'#a9c58f','#6d3a92');
+  OSM.l.forEach(l=>poly(l[2],l[0]==='track'?'#c0745a':'#98bb7c'));OSM.w.forEach(w=>poly(w[1],'#6f9fb0'));
+  roads.forEach(r=>{x.beginPath();r.g.forEach((p,i)=>{const q=P(p);i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1])});x.strokeStyle='#fbfaf6';x.lineWidth=Math.max(1,r.w*k*.9);x.lineCap='round';x.stroke()});
+  B.forEach(b=>poly(b.g,b.inC?(b.name?'#6d3a92':'#8c8090'):'#9a978e'))}
+const camF=new THREE.Vector3();
+function drawMM(){const k=MW*dpr/MSPAN;mmx.drawImage(base,0,0);
+  STOPS.forEach((s,i)=>{mmx.fillStyle=i===cur?'#ffcf5a':'#ffffff';mmx.beginPath();mmx.arc((s.c[0]-MX0)*k,(s.c[1]-MZ0)*k,(i===cur?4:2.5)*dpr,0,7);mmx.fill()});
+  const px=(camera.position.x-MX0)*k,pz=(camera.position.z-MZ0)*k;camera.getWorldDirection(camF);const a=Math.atan2(camF.z,camF.x);
+  mmx.fillStyle='rgba(255,207,90,.28)';mmx.beginPath();mmx.moveTo(px,pz);mmx.arc(px,pz,34*dpr,a-.45,a+.45);mmx.closePath();mmx.fill();
+  mmx.fillStyle='#ffcf5a';mmx.strokeStyle='#1d2621';mmx.lineWidth=1.5*dpr;mmx.beginPath();mmx.arc(px,pz,4.5*dpr,0,7);mmx.fill();mmx.stroke()}
+mm.addEventListener('click',e=>{const r=mm.getBoundingClientRect();const x=MX0+(e.clientX-r.left)/r.width*MSPAN,z=MZ0+(e.clientY-r.top)/r.height*MZS;stopModes();
+  if(walk){if(!blocked(x,z,1))wfly={p0:camera.position.clone(),p1:new THREE.Vector3(x,1.7,z),s:performance.now(),d:900}}
+  else{const t=new THREE.Vector3(x,0,z);const off=camera.position.clone().sub(controls.target);flyTo(t.clone().add(off),t,1300)}});
+
+/* =====================================================================
+   EXTRAS: wayfinding, treasure hunt, inside-the-building view, presentation mode
+   ===================================================================== */
+const XL=$('xlabels');
+function proj(v){const p=v.clone().project(camera);return {x:(p.x*.5+.5)*innerWidth,y:(-p.y*.5+.5)*innerHeight,ok:p.z<1&&Math.abs(p.x)<1.1&&Math.abs(p.y)<1.1}}
+function tool(html){const t=$('tool');t.innerHTML=html;t.hidden=!html}
+
+/* ---------- 1) wayfinding on the road network ---------- */
+const RG={nodes:[],adj:[]};
+{const idx=new Map();const nid=(x,z)=>{const k=Math.round(x*2)+','+Math.round(z*2);if(!idx.has(k)){idx.set(k,RG.nodes.length);RG.nodes.push([x,z]);RG.adj.push([])}return idx.get(k)};
+  const link=(a,b)=>{if(a===b)return;const d=Math.hypot(RG.nodes[a][0]-RG.nodes[b][0],RG.nodes[a][1]-RG.nodes[b][1]);RG.adj[a].push([b,d]);RG.adj[b].push([a,d])};
+  roads.forEach(r=>{if(r.t==='tr')return;let prev=-1;r.g.forEach(p=>{const n=nid(p[0],p[1]);if(prev>=0)link(prev,n);prev=n})});
+  /* snap road ends that almost touch */
+  const N=RG.nodes.length;for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){const a=RG.nodes[i],b=RG.nodes[j];if(Math.abs(a[0]-b[0])<5&&Math.abs(a[1]-b[1])<5&&Math.hypot(a[0]-b[0],a[1]-b[1])<5)link(i,j)}}
+function nearestEdge(x,z){let best=null,bd=1e9;for(let a=0;a<RG.nodes.length;a++)for(const [b] of RG.adj[a]){if(b<a)continue;const A=RG.nodes[a],Bn=RG.nodes[b],dx=Bn[0]-A[0],dz=Bn[1]-A[1],L2=dx*dx+dz*dz||1;
+  const t=clamp(((x-A[0])*dx+(z-A[1])*dz)/L2,0,1),px=A[0]+dx*t,pz=A[1]+dz*t,d=Math.hypot(x-px,z-pz);if(d<bd){bd=d;best={a,b,p:[px,pz]}}}return best}
+function route(from,to){const s=nearestEdge(from[0],from[1]),e=nearestEdge(to[0],to[1]);if(!s||!e)return null;
+  const n=RG.nodes.length,S=n,E=n+1;const dist=new Float64Array(n+2).fill(Infinity),prev=new Int32Array(n+2).fill(-1),done=new Uint8Array(n+2);
+  const P=i=>i===S?s.p:i===E?e.p:RG.nodes[i];const nb=i=>{if(i===S)return [[s.a,Math.hypot(...[0,1].map(k=>s.p[k]-RG.nodes[s.a][k]))],[s.b,Math.hypot(...[0,1].map(k=>s.p[k]-RG.nodes[s.b][k]))]];
+    const l=(RG.adj[i]||[]).slice();if(i===e.a||i===e.b)l.push([E,Math.hypot(...[0,1].map(k=>e.p[k]-RG.nodes[i][k]))]);return l};
+  dist[S]=0;const heap=[[0,S]];
+  while(heap.length){let bi=0;for(let k=1;k<heap.length;k++)if(heap[k][0]<heap[bi][0])bi=k;const [d,u]=heap.splice(bi,1)[0];if(done[u])continue;done[u]=1;if(u===E)break;
+    for(const [v,w] of nb(u)){if(d+w<dist[v]){dist[v]=d+w;prev[v]=u;heap.push([dist[v],v])}}}
+  if(!isFinite(dist[E]))return null;const pts=[];for(let u=E;u>=0;u=prev[u]){pts.push(P(u));if(u===S)break}pts.reverse();
+  return {pts:[from,...pts,to],len:dist[E]+Math.hypot(from[0]-s.p[0],from[1]-s.p[1])+Math.hypot(to[0]-e.p[0],to[1]-e.p[1])}}
+const arrowTex=(()=>{const [c,x]=cv(64,64);x.clearRect(0,0,64,64);x.strokeStyle='#ffffff';x.lineWidth=9;x.lineCap='round';x.beginPath();x.moveTo(14,44);x.lineTo(32,22);x.lineTo(50,44);x.stroke();
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t})();
+const routeMat=new THREE.MeshBasicMaterial({map:arrowTex,color:'#ffcf5a',transparent:true,depthWrite:false,toneMapped:false,side:THREE.DoubleSide});
+const routeBase=new THREE.MeshBasicMaterial({color:'#6d3a92',transparent:true,opacity:.55,depthWrite:false,toneMapped:false});
+let routeObj=null,routeData=null,follow=null;
+function clearRoute(){if(routeObj){scene.remove(routeObj);routeObj.traverse(o=>o.geometry&&o.geometry.dispose());routeObj=null}routeData=null;follow=null}
+function drawRoute(r){clearRoute();routeData=r;const g=new THREE.Group();
+  const base=ribbonGeo([{pts:r.pts,w:3,y:.62}]);g.add(new THREE.Mesh(base,routeBase));
+  const top=ribbonGeo([{pts:r.pts,w:2.2,y:.66}]);const uv=top.attributes.uv;for(let i=0;i<uv.count;i++){uv.setX(i,uv.getX(i)>0?1:0);uv.setY(i,uv.getY(i)*9/4)}const m=new THREE.Mesh(top,routeMat);m.renderOrder=3;g.add(m);
+  [r.pts[0],r.pts[r.pts.length-1]].forEach((p,k)=>{const pin=new THREE.Mesh(new THREE.ConeGeometry(1.6,4.5,16),new THREE.MeshBasicMaterial({color:k?'#e0453a':'#2f9e6a',toneMapped:false}));pin.rotation.x=Math.PI;pin.position.set(p[0],5,p[1]);g.add(pin)});
+  scene.add(g);routeObj=g}
+function stopOpts(sel){return STOPS.map((s,i)=>`<option value="${i}"${i===sel?' selected':''}>${String(i+1).padStart(2,'0')} ${s.t}</option>`).join('')}
+function openNav(){stopModes();closeHunt();tool(`<div class="th"><b>🧭 นำทางในมหาวิทยาลัย</b><button class="x" id="navX" aria-label="ปิด">✕</button></div>
+  <label>จาก<select id="navFrom">${stopOpts(0)}</select></label><label>ไป<select id="navTo">${stopOpts(Math.max(0,STOPS.findIndex(s=>/ภูมิราชภัฏ/.test(s.t))))}</select></label>
+  <div class="trow"><button class="primary" id="navGo" type="button">แสดงเส้นทาง</button><button id="navWalk" type="button" disabled>🚶 เดินตามเส้นทาง</button></div><div id="navOut" class="tout">เลือกต้นทางและปลายทาง เส้นทางจะเดินตามถนนและทางในมหาวิทยาลัย</div>`);
+  $('navX').onclick=()=>{clearRoute();tool('')};
+  $('navGo').onclick=()=>{const a=STOPS[+$('navFrom').value],b=STOPS[+$('navTo').value];const r=route(a.c,b.c);
+    if(!r){$('navOut').textContent='หาเส้นทางระหว่างสองจุดนี้ไม่พบ';return}drawRoute(r);
+    const mins=Math.max(1,Math.round(r.len/1.3/60));$('navOut').innerHTML=`<b>${Math.round(r.len).toLocaleString('th-TH')} ม.</b> · เดินประมาณ <b>${mins} นาที</b> · จักรยาน ~${Math.max(1,Math.round(r.len/4.2/60))} นาที`;$('navWalk').disabled=false;
+    if(walk)setWalk(false);const xs=r.pts.map(p=>p[0]),zs=r.pts.map(p=>p[1]);const cx=(Math.min(...xs)+Math.max(...xs))/2,cz=(Math.min(...zs)+Math.max(...zs))/2,span=Math.max(Math.max(...xs)-Math.min(...xs),Math.max(...zs)-Math.min(...zs));
+    const t=new THREE.Vector3(cx,0,cz);flyTo(t.clone().add(new THREE.Vector3(-.45*span,Math.max(120,span*1.1),.75*span+40)),t,1500)};
+  $('navWalk').onclick=()=>{if(!routeData)return;if(!walk)setWalk(true,routeData.pts[0]);const p=mkPath(routeData.pts);follow={p,s:0,v:REDUCED?50:3.2};wfly=null}}
+$('navBtn').onclick=openNav;
+
+/* ---------- 2) treasure hunt ---------- */
+const QUIZ=[
+ {at:'ป้ายมหาวิทยาลัย',q:'มหาวิทยาลัยราชภัฏอุตรดิตถ์ก่อตั้งขึ้นครั้งแรกในปีใด',o:['พ.ศ. 2479','พ.ศ. 2518','พ.ศ. 2535','พ.ศ. 2547'],a:0,why:'ก่อตั้งเมื่อ 1 สิงหาคม 2479 ในชื่อโรงเรียนฝึกหัดครูประกาศนียบัตร จังหวัดอุตรดิตถ์'},
+ {at:'สนามหน้ามหาวิทยาลัย',q:'ต้นไม้ประจำมหาวิทยาลัยคือต้นอะไร',o:['ราชพฤกษ์','หางนกยูงฝรั่ง','ประดู่','อินทนิล'],a:1,why:'ต้นหางนกยูงฝรั่ง และกีฬาภายในของมหาวิทยาลัยก็ชื่อ "หางนกยูงเกมส์"'},
+ {at:'อาคาร ED',q:'หน้าอาคารคณะครุศาสตร์หลังใหม่ (ED) ประดิษฐานเทพองค์ใด',o:['พระพิฆเนศ','พระวิษณุกรรม','พระพฤหัสบดี','พระแม่ธรณี'],a:2,why:'พระพฤหัสบดี เทพแห่งวิชาชีพครู สร้างปี 2558'},
+ {at:'อาคารภูมิราชภัฏ',q:'อาคารภูมิราชภัฏ อาคารที่สูงที่สุดในมหาวิทยาลัย สูงกี่ชั้น',o:['6 ชั้น','7 ชั้น','9 ชั้น','12 ชั้น'],a:2,why:'9 ชั้น สร้างปี 2540 เสร็จปี 2542'},
+ {at:'อาคาร ICIT',q:'จุดเด่นบนหลังคาของอาคาร ICIT คืออะไร',o:['โดมกลม','ยอดฉัตรสีทอง','สวนดาดฟ้า','หอนาฬิกา'],a:0,why:'อาคาร 4 ชั้น มีโดมกลมอยู่บนหลังคาชั้น 4'},
+ {at:'อาคารคณะวิทยาการจัดการ',q:'หน้าอาคารคณะวิทยาการจัดการประดิษฐานเทพองค์ใด',o:['พระพิฆเนศ','พระพฤหัสบดี','พระวิษณุกรรม','ท้าวเวสสุวรรณ'],a:0,why:'พระพิฆเนศ เทพแห่งความสำเร็จ'},
+ {at:'สำนักวิทยบริการ',q:'อาคารบรรณราชนครินทร์ของสำนักวิทยบริการฯ สูงกี่ชั้น',o:['3 ชั้น','4 ชั้น','6 ชั้น','9 ชั้น'],a:2,why:'6 ชั้น สร้างเสร็จปี 2541'},
+ {at:'หอประชุมมหาวิทยาลัย',q:'หอประชุมมหาวิทยาลัยเป็นอาคารลักษณะใด',o:['ทรงยุโรป 3 ชั้น','ทรงไทยประยุกต์ 1 ชั้น','โดมกระจก','อาคารสูง 5 ชั้น'],a:1,why:'อาคารอเนกประสงค์ทรงไทยประยุกต์ 1 ชั้น มีประตูเข้า-ออก 3 ประตู'},
+].map(q=>{const s=STOPS.find(x=>x.t.includes(q.at));return s?Object.assign(q,{stop:s}):null}).filter(Boolean);
+const coinMat=S({color:'#f2c14e',metalness:.85,roughness:.25,emissive:'#7a5200',emissiveIntensity:.4});
+const beamMat=new THREE.MeshBasicMaterial({color:'#ffd76a',transparent:true,opacity:.22,depthWrite:false,toneMapped:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide});
+let hunt=null;
+function huntSpot(q){const s=q.stop;const np=nearestRoad(s.c[0],s.c[1]);let p=[s.c[0],s.c[1]];if(s.info&&np){const d=Math.hypot(np[0]-s.c[0],np[1]-s.c[1])||1;p=[np[0]+(s.c[0]-np[0])/d*Math.min(8,d*.3),np[1]+(s.c[1]-np[1])/d*Math.min(8,d*.3)]}return p}
+function startHunt(){stopModes();clearRoute();closeHunt();hunt={t0:performance.now(),score:0,found:0,items:[],open:-1,done:false};
+  QUIZ.forEach((q,i)=>{const p=huntSpot(q);const g=new THREE.Group();g.position.set(p[0],0,p[1]);
+    const coin=new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,.35,32),coinMat);coin.rotation.x=Math.PI/2;coin.position.y=3.2;coin.castShadow=true;g.add(coin);
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.1,60,16,1,true),beamMat);beam.position.y=30;g.add(beam);
+    coin.userData.hunt=i;scene.add(g);const l=document.createElement('div');l.className='hl glass';l.textContent='★ '+(i+1);l.onclick=()=>askQ(i);XL.appendChild(l);
+    hunt.items.push({g,coin,p,l,got:false})});
+  renderHunt();overview(1600);showCard('ภารกิจ','ตามหาเหรียญทั้ง '+QUIZ.length+' จุด','เดินชมหรือบินไปที่เหรียญทอง แตะเหรียญเพื่อตอบคำถาม ในโหมดเดินชม คำถามจะขึ้นเองเมื่อเดินเข้าใกล้',null,PIN.uni)}
+function renderHunt(){if(!hunt)return;const el=Math.floor((performance.now()-hunt.t0)/1000);
+  tool(`<div class="th"><b>🏆 ภารกิจล่าเหรียญ</b><button class="x" id="huntX" aria-label="ออกจากภารกิจ">✕</button></div>
+  <div class="hstat"><div><small>เจอแล้ว</small><b>${hunt.found}/${QUIZ.length}</b></div><div><small>คะแนน</small><b>${hunt.score}</b></div><div><small>เวลา</small><b id="hTime">${Math.floor(el/60)}:${String(el%60).padStart(2,'0')}</b></div></div>
+  <div class="hlist">${hunt.items.map((it,i)=>`<button type="button" class="hchip${it.got?' got':''}" data-i="${i}">${it.got?'✓':'★'} ${QUIZ[i].stop.t}</button>`).join('')}</div>
+  <div id="hQ"></div>`);
+  $('huntX').onclick=()=>{closeHunt();tool('')};
+  document.querySelectorAll('.hchip').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;const it=hunt.items[i];if(it.got)return;const t=new THREE.Vector3(it.p[0],2,it.p[1]);if(walk)setWalk(false);flyTo(t.clone().add(new THREE.Vector3(-30,28,45)),t,1300)});
+  if(hunt.open>=0)renderQ(hunt.open)}
+function askQ(i){if(!hunt||hunt.items[i].got)return;hunt.open=i;renderQ(i)}
+function renderQ(i){const q=QUIZ[i],box=$('hQ');if(!box)return;box.innerHTML=`<div class="qcard"><div class="qat">จุดที่ ${i+1}: ${q.stop.t}</div><p class="qq">${q.q}</p><div class="qo">${q.o.map((o,k)=>`<button type="button" data-k="${k}">${o}</button>`).join('')}</div><div class="qf" id="qf"></div></div>`;
+  box.querySelectorAll('.qo button').forEach(b=>b.onclick=()=>{const k=+b.dataset.k;const ok=k===q.a;box.querySelectorAll('.qo button').forEach((x,j)=>{x.disabled=true;if(j===q.a)x.classList.add('ok');else if(j===k)x.classList.add('no')});
+    $('qf').innerHTML=(ok?'<b>ถูกต้อง +10</b> ':'<b>ยังไม่ถูก</b> คำตอบคือ '+q.o[q.a]+' · ')+q.why+'<div class="trow" style="margin-top:8px"><button class="primary" id="qNext" type="button">ไปต่อ</button></div>';
+    const it=hunt.items[i];it.got=true;hunt.found++;if(ok)hunt.score+=10;scene.remove(it.g);it.l.remove();hunt.open=-1;
+    $('qNext').onclick=()=>{if(hunt.found>=QUIZ.length)finishHunt();else renderHunt()}})}
+function finishHunt(){const el=Math.floor((performance.now()-hunt.t0)/1000);hunt.done=true;
+  tool(`<div class="th"><b>🏆 ภารกิจสำเร็จ</b><button class="x" id="huntX" aria-label="ปิด">✕</button></div><div class="hstat"><div><small>คะแนน</small><b>${hunt.score}/${QUIZ.length*10}</b></div><div><small>เวลา</small><b>${Math.floor(el/60)}:${String(el%60).padStart(2,'0')}</b></div></div>
+  <p class="tout">${hunt.score===QUIZ.length*10?'ตอบถูกครบทุกข้อ รู้จักมหาวิทยาลัยดีมาก':'ลองเล่นอีกครั้งเพื่อทำคะแนนให้เต็ม'}</p><div class="trow"><button class="primary" id="huntAgain" type="button">เล่นอีกครั้ง</button></div>`);
+  $('huntX').onclick=()=>{closeHunt();tool('')};$('huntAgain').onclick=startHunt}
+function closeHunt(){if(!hunt)return;hunt.items.forEach(it=>{scene.remove(it.g);it.l.remove()});hunt=null}
+function huntPick(rc){if(!hunt)return false;const coins=hunt.items.filter(it=>!it.got).map(it=>it.coin);const h=rc.intersectObjects(coins,false)[0];if(h){askQ(h.object.userData.hunt);return true}return false}
+$('huntBtn').onclick=startHunt;
+
+/* ---------- 3) inside the building: exploded floors ---------- */
+const FLOORS={
+ 'สำนักวิทยบริการและเทคโนโลยีสารสนเทศ (ARIT)':['นิตยสาร วารสาร','ห้องนิทรรศการถาวรเรื่องพระราชกรณียกิจ · หนังสือสาขามนุษยศาสตร์','หนังสือสาขาสังคมศาสตร์ · ห้องสมุดนิติศาสตร์','หนังสือสาขาวิทยาศาสตร์','ห้องเฉลิมพระเกียรติราชวงศ์จักรี · ห้องราชภูมิปัญญา · ปริญญานิพนธ์และงานวิจัย','บริการโสตทัศนวัสดุ · ห้องประชุม อบรม สัมมนา'],
+};
+let interior=null;const glassMat=S({color:'#cfe6f2',transparent:true,opacity:.18,roughness:.05,metalness:.1,depthWrite:false,side:THREE.DoubleSide});
+const slabMat=S({color:'#efe9dc',roughness:.85});const slabTop=S({color:'#d9cfb8',roughness:.9});
+function openInside(info){closeInside();if(!info)return;const n=Math.max(1,info.floors||Math.round(info.h/3.5)),fh=info.h/n,data=FLOORS[info.name]||null;
+  const meshes=[info.mesh,...(info.extra||[])];meshes.forEach(m=>m.visible=false);if(info.name==='อาคารภูมิราชภัฏ')scene.traverse(o=>{if(o.userData&&o.userData.info===info)o.visible=false});
+  const g=new THREE.Group();scene.add(g);const floors=[];
+  for(let f=0;f<n;f++){const fl=new THREE.Group();const slab=extrudeLocal(info.g,.35,[slabTop,slabMat]);fl.add(slab);const wall=extrudeLocal(info.g,fh-.4,[glassMat,glassMat]);wall.position.y=.35;fl.add(wall);
+    const roomsN=Math.max(2,Math.min(6,Math.round(Math.sqrt(info.a)/9)));for(let k=0;k<roomsN;k++){const t=(k+.5)/roomsN;const a=info.g[0],b=info.g[Math.floor(info.g.length/2)];
+      const px=lerp(a[0],b[0],t),pz=lerp(a[1],b[1],t);const c=info.c;const box=new THREE.Mesh(new THREE.BoxGeometry(2.4,1,1.2),S({color:['#8e6b4f','#5b7a99','#7a8f5a'][k%3],roughness:.8}));box.position.set(lerp(px,c[0],.35),.85,lerp(pz,c[1],.35));fl.add(box)}
+    fl.userData.base=f*fh;fl.position.y=f*fh;g.add(fl);
+    const l=document.createElement('div');l.className='fl glass';l.innerHTML=`<b>ชั้น ${f+1}</b>${data&&data[f]?`<span>${data[f]}</span>`:''}`;XL.appendChild(l);floors.push({fl,l})}
+  interior={info,g,floors,meshes,t0:performance.now()};
+  const t=new THREE.Vector3(info.c[0],info.h*.75,info.c[1]);const r=Math.max(60,Math.sqrt(info.a)*2.6);flyTo(new THREE.Vector3(info.c[0]-r*.7,info.h*1.4+20,info.c[1]+r*.8),t,1500);
+  $('inBtn').textContent='ปิดมุมมองภายใน';$('inBtn').onclick=closeInside}
+function extrudeLocal(g,h,mats){const m=new THREE.Mesh(new THREE.ExtrudeGeometry(shapeOf(g),{depth:h,bevelEnabled:false}),mats);m.rotation.x=-Math.PI/2;m.castShadow=true;m.receiveShadow=true;return m}
+function closeInside(){if(!interior)return;interior.meshes.forEach(m=>m.visible=true);scene.traverse(o=>{if(o.userData&&o.userData.info===interior.info)o.visible=true});
+  scene.remove(interior.g);interior.floors.forEach(f=>f.l.remove());interior=null;$('inBtn').textContent='🏢 ดูภายในอาคาร';$('inBtn').onclick=()=>openInside(cardInfo)}
+let cardInfo=null;function setCardInfo(info){cardInfo=info;$('inBtn').hidden=!(info&&info.floors>=2&&info.kind!=='dome');if(!interior){$('inBtn').textContent='🏢 ดูภายในอาคาร';$('inBtn').onclick=()=>openInside(cardInfo)}}
+
+/* ---------- 4) presentation mode ---------- */
+function setPresent(on){document.body.classList.toggle('present',on);if(on){closeInside();tool('');$('droneBtn').click&&!drone&&$('droneBtn').click()}else if(drone){stopModes()}}
+$('presentBtn').onclick=()=>setPresent(true);$('presentX').onclick=()=>setPresent(false);
+addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('present'))setPresent(false)});
+
+/* ---------- per-frame update for extras ---------- */
+function updateExtras(dt,now){
+  arrowTex.offset.y-=dt*.9;
+  if(follow&&walk){follow.s+=follow.v*dt;const [x,z,dx,dz]=at(follow.p,follow.s);camera.position.set(x,1.7+Math.sin(now/170)*.035,z);const ty=Math.atan2(-dx,-dz);let d=ty-yaw;d=Math.atan2(Math.sin(d),Math.cos(d));yaw+=d*Math.min(1,dt*3);pitch=lerp(pitch,-.03,dt*2);camera.rotation.set(pitch,yaw,0,'YXZ');
+    if(follow.s>=follow.p.L){follow=null;showCard('ถึงปลายทางแล้ว',STOPS[+($('navTo')||{value:0}).value].t,'เดินตามเส้นทางครบแล้ว ลองเลือกปลายทางใหม่ หรือกดภาพรวมเพื่อดูจากมุมสูง',null,[camera.position.x,camera.position.z])}}
+  if(hunt){hunt.items.forEach((it,i)=>{if(it.got)return;it.coin.rotation.z=now/600+i;it.coin.position.y=3.2+Math.sin(now/500+i)*.35;
+      const pr=proj(new THREE.Vector3(it.p[0],5.6,it.p[1]));it.l.style.display=pr.ok?'block':'none';if(pr.ok)it.l.style.transform=`translate(${pr.x}px,${pr.y}px) translate(-50%,-100%)`;
+      if(walk&&hunt.open<0&&Math.hypot(camera.position.x-it.p[0],camera.position.z-it.p[1])<9)askQ(i)});
+    const ht=$('hTime');if(ht&&!hunt.done){const el=Math.floor((now-hunt.t0)/1000);ht.textContent=`${Math.floor(el/60)}:${String(el%60).padStart(2,'0')}`}}
+  if(interior){const k=Math.min(1,(now-interior.t0)/1200),e=1-Math.pow(1-k,3);const gap=REDUCED?6:6*e;
+    interior.floors.forEach(({fl,l},f)=>{fl.position.y=fl.userData.base+f*gap;const pr=proj(new THREE.Vector3(interior.info.c[0],fl.position.y+1.2,interior.info.c[1]));l.style.display=pr.ok?'flex':'none';if(pr.ok)l.style.transform=`translate(${pr.x}px,${pr.y}px) translate(18px,-50%)`})}}
+
+/* ---------- intro ---------- */
+let introOn=!REDUCED;function skipIntro(){if(!introOn)return;introOn=false;$('intro').classList.add('out');setTimeout(()=>$('intro').hidden=true,1300)}
+/* ---------- resize ---------- */
+function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
+
+/* ---------- frame loop ---------- */
+const SC2=new THREE.Vector3(.85,.85,.4);const M4=new THREE.Matrix4(),Q=new THREE.Quaternion(),V=new THREE.Vector3(),SC=new THREE.Vector3(1,1,1),ZERO=new THREE.Vector3(0,0,0),UP=new THREE.Vector3(0,1,0);
+const vP=new THREE.Vector3(),camPos=new THREE.Vector3();let last=performance.now(),flashT=0,nextBolt=8000,lapseAcc=0;
+function frame(now){const dt=Math.min(.05,(now-last)/1000);last=now;uTime.value=now/1000;
+  /* flights */
+  if(fly){const k=Math.min(1,(now-fly.s)/fly.d),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+    if(fly.mid){const a=1-e;camera.position.set(a*a*fly.p0.x+2*a*e*fly.mid.x+e*e*fly.p1.x,a*a*fly.p0.y+2*a*e*fly.mid.y+e*e*fly.p1.y,a*a*fly.p0.z+2*a*e*fly.mid.z+e*e*fly.p1.z)}
+    else camera.position.lerpVectors(fly.p0,fly.p1,e);controls.target.lerpVectors(fly.t0,fly.t1,e);if(k>=1){fly=null;if(introOn)setTimeout(skipIntro,900)}}
+  if(drone&&!fly){droneA+=dt*.06;const r=720,c=[70,60];camera.position.set(c[0]+Math.cos(droneA)*r,330+Math.sin(droneA*2)*40,c[1]+Math.sin(droneA)*r);controls.target.set(c[0],0,c[1])}
+  if(walk){
+    if(wfly){const k=Math.min(1,(now-wfly.s)/wfly.d),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;camera.position.lerpVectors(wfly.p0,wfly.p1,e);
+      if(wfly.q0){const qt=new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));camera.quaternion.copy(wfly.q0).slerp(qt,e)}
+      else{if(wfly.y1!==undefined){let d=wfly.y1-wfly.y0;d=Math.atan2(Math.sin(d),Math.cos(d));yaw=wfly.y0+d*e;pitch=lerp(wfly.pi0,wfly.pi1,e)}camera.rotation.set(pitch,yaw,0,'YXZ')}
+      if(k>=1)wfly=null}
+    else{let fx=0,fz=0;if(keys.KeyW||keys.ArrowUp)fz+=1;if(keys.KeyS||keys.ArrowDown)fz-=1;if(keys.KeyA)fx-=1;if(keys.KeyD)fx+=1;if(keys.ArrowLeft)yaw+=dt*1.6;if(keys.ArrowRight)yaw-=dt*1.6;
+      if(joy){fz-=joy.y;yaw-=joy.x*dt*1.8}
+      const sp=(keys.ShiftLeft||keys.ShiftRight?11:4.2)*dt;const sx=-Math.sin(yaw),sz=-Math.cos(yaw);
+      const nx=camera.position.x+(sx*fz+(-sz)*fx)*sp,nz=camera.position.z+(sz*fz+sx*fx)*sp;
+      if(!blocked(nx,camera.position.z,.6))camera.position.x=nx;if(!blocked(camera.position.x,nz,.6))camera.position.z=nz;
+      const moving=(fx||fz)?1:0;camera.position.y=1.7+moving*Math.sin(now/170)*.035;camera.rotation.set(pitch,yaw,0,'YXZ')}}
+  else controls.update();
+  if(touring){const el=now-tourT;$('progBar').style.width=Math.min(100,el/DWELL*100)+'%';
+    if(!fly&&!walk){const a=dt*.07,t=controls.target,p=camera.position,dx=p.x-t.x,dz=p.z-t.z,c=Math.cos(a),s=Math.sin(a);p.x=t.x+dx*c-dz*s;p.z=t.z+dx*s+dz*c}
+    if(el>DWELL){go(cur+1);tourT=now}}
+  /* time-lapse */
+  if(lapse){hour=(hour+dt*.42)%24;$('timeRange').value=hour;lapseAcc+=dt;if(lapseAcc>.08){lapseAcc=0;applyTime()}}
+  /* sun follows the view so shadows stay crisp */
+  const tg=walk?camera.position:controls.target;const useMoon=sunDir.y<0;const ld=useMoon?moonDir:sunDir;
+  sun.target.position.set(tg.x,0,tg.z);sun.position.set(tg.x+ld.x*900,ld.y*900,tg.z+ld.z*900);
+  /* water */
+  T.water.offset.set(now*.000012,now*.000008);
+  if(selRing.visible){const q=(now/1400)%1;selRing.scale.setScalar(selRing.userData.r*(1+q*.35));selRing.material.opacity=.85*(1-q)}
+  /* beacon pulse */
+  const bp=(now/1600)%1;beacon.scale.setScalar(1+bp*2.2);beacon.material.opacity=.8*(1-bp);beacon2.scale.setScalar(1+((bp+.5)%1)*2.2);
+  /* cars */
+  const hp=headG.attributes.position.array,tp=tailG.attributes.position.array;
+  cars.forEach((c,i)=>{c.s+=c.v*c.dir*dt;if(c.s>c.p.L||c.s<0){c.dir*=-1;c.s=clamp(c.s,0,c.p.L)}
+    const [x,z,dx0,dz0]=at(c.p,c.s);const dx=dx0*c.dir,dz=dz0*c.dir;const off=c.p.w>=7?c.p.w*.25:c.p.w*.22;const px=x-dz*off,pz=z+dx*off;
+    Q.setFromAxisAngle(UP,Math.atan2(-dz,dx));
+    if(c.moto){M4.compose(V.set(px,0,pz),Q,SC);motoB.setMatrixAt(i,M4);M4.compose(ZERO,Q,ZERO);carB.setMatrixAt(i,M4);carC.setMatrixAt(i,M4)}
+    else{M4.compose(V.set(px,0,pz),Q,SC);carB.setMatrixAt(i,M4);carC.setMatrixAt(i,M4);M4.compose(ZERO,Q,ZERO);motoB.setMatrixAt(i,M4)}
+    for(let w=0;w<4;w++){if(c.moto&&w%2){M4.compose(ZERO,Q,ZERO)}else{const o=c.moto?[w<2?.75:-.75,.3,0]:WOFF[w];V.set(o[0],o[1],o[2]).applyQuaternion(Q);M4.compose(V.set(px+V.x,V.y,pz+V.z),Q,c.moto?SC2:SC)}carW.setMatrixAt(i*4+w,M4)}
+    const L=c.moto?1:2.2;hp[i*3]=px+dx*L;hp[i*3+1]=.9;hp[i*3+2]=pz+dz*L;tp[i*3]=px-dx*L;tp[i*3+1]=.9;tp[i*3+2]=pz-dz*L});
+  carW.instanceMatrix.needsUpdate=carB.instanceMatrix.needsUpdate=carC.instanceMatrix.needsUpdate=motoB.instanceMatrix.needsUpdate=true;headG.attributes.position.needsUpdate=tailG.attributes.position.needsUpdate=true;
+  /* people */
+  updatePeople(dt,now);
+  /* rain + lightning */
+  if(raining){rain.position.set(camera.position.x,Math.max(0,camera.position.y-60),camera.position.z);const a=rainG.attributes.position.array;const fall=dt*55;
+    for(let i=0;i<RN;i++){const k=i*6;a[k+1]-=fall;a[k+4]-=fall;if(a[k+4]<0){const y=110+R()*20;a[k+1]=y;a[k+4]=y-1.6}}rainG.attributes.position.needsUpdate=true;
+    nextBolt-=dt*1000;if(nextBolt<0){nextBolt=7000+R()*9000;flashT=now;$('flash').style.opacity=.55;setTimeout(()=>$('flash').style.opacity=0,90);setTimeout(()=>{$('flash').style.opacity=.3;setTimeout(()=>$('flash').style.opacity=0,70)},180)}
+    hemi.intensity+=(now-flashT<260?2.5:0)-(hemi.__b||0);hemi.__b=(now-flashT<260?2.5:0)}
+  updateExtras(dt,now);
+  renderer.render(scene,camera);
+  /* labels */
+  const W=innerWidth,H=innerHeight;camPos.copy(camera.position);
+  STOPS.forEach(s=>{vP.set(s.c[0],s.h+5,s.c[1]);const d=camPos.distanceTo(vP);vP.project(camera);const vis=vP.z<1&&Math.abs(vP.x)<1.05&&Math.abs(vP.y)<1.05&&d<(walk?260:1700);
+    if(!vis){if(s.lbl.style.display!=='none')s.lbl.style.display='none';return}s.lbl.style.display='flex';s.lbl.classList.toggle('far',!walk&&d>520);s.lbl.style.transform=`translate(${(vP.x*.5+.5)*W}px,${(-vP.y*.5+.5)*H}px) translate(-50%,calc(-100% - 7px))`});
+  if(mMid&&!mLabel.hidden){vP.copy(mMid).project(camera);mLabel.style.transform=`translate(${(vP.x*.5+.5)*W}px,${(-vP.y*.5+.5)*H}px) translate(-50%,-140%)`}
+  drawMM();window.__fc=(window.__fc||0)+1;requestAnimationFrame(frame)}
+
+/* ---------- start ---------- */
+applyTime();showCard('ภาพรวม','มหาวิทยาลัยราชภัฏอุตรดิตถ์','วิทยาเขตตั้งอยู่ระหว่างถนนอินใจมีกับถนนเจษฎาบดินทร์ เส้นทาง อาคาร สนามกีฬา และสระน้ำในแบบจำลองมาจาก OpenStreetMap',null,PIN.uni);
+if(REDUCED){camera.position.copy(OVER[0]);controls.target.copy(OVER[1]);$('intro').hidden=true}
+else{camera.position.set(-1900,1300,2300);controls.target.set(70,0,30);flyTo(OVER[0].clone(),OVER[1].clone(),7000,new THREE.Vector3(1300,700,1500))}
+requestAnimationFrame(frame);
+window.__ready=true;/*TESTHOOK*/
+})();
+</script>
+
+</body></html>
